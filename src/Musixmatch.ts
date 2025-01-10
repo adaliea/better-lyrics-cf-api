@@ -259,7 +259,7 @@ export class Musixmatch {
         return { synced: lrcStr, unsynced: null };
     }
 
-    async getLrc(artist: string, track: string, album: string | null): Promise<LyricsResponse | null> {
+    async getLrc(artist: string, track: string, album: string | null, enhanced: boolean): Promise<LyricsResponse | null> {
 
         let query: [string, string][] = [
             ['q_track', track],
@@ -283,7 +283,7 @@ export class Musixmatch {
         const hasSubtitles = data.message.body.track.has_subtitles;
         const hasLyrics = data.message.body.track.has_lyrics;
         console.log('hasRichLyrics', hasRichLyrics, "hasSubtitles", hasSubtitles, "hasLyrics", hasLyrics);
-        if (hasRichLyrics) {
+        if (hasRichLyrics && enhanced) {
             return this.getLrcWordByWord(trackId);
         } else if (hasSubtitles) {
             return this.getLrcById(trackId);

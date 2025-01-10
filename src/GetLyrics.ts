@@ -40,6 +40,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let parsedSongAndArtist: string | null = null;
     let videoId = params.get("videoId");
     let description: string | null = null;
+    let enhanced = (params.get("enhanced") || "false").toLowerCase() === "true";
 
     if (!videoId) {
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
@@ -113,7 +114,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     };
     await tokenPromise;
     try {
-        let lyrics = await mx.getLrc(artist, song, album);
+        let lyrics = await mx.getLrc(artist, song, album, enhanced);
         if (lyrics) {
             response.lyrics = lyrics.synced;
         }
@@ -121,7 +122,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         console.error(e);
     }
     let json = JSON.stringify(response);
-    awaitLists.add(cache.put(request.url,  new Response(json, { status: 400 })));
-    return new Response(json, { status: 400 });
+    awaitLists.add(cache.put(request.url,  new Response(json, { status: 200 })));
+    return new Response(json, { status: 200 });
 
 }
