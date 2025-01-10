@@ -1,4 +1,6 @@
 // Types for our responses and data
+import { awaitLists } from './index';
+
 interface LyricsResponse {
     synced: string | null;
     unsynced: string | null;
@@ -99,6 +101,7 @@ export class Musixmatch {
     private cookies: { key: string, cookie: string }[] = [];
     private readonly ROOT_URL = 'https://apic-desktop.musixmatch.com/ws/1.1/';
 
+    private cache = caches.default;
 
     private async _get(action: string, query: [string, string][]): Promise<Response> {
         if (action !== 'token.get' && !this.token) {
@@ -110,12 +113,21 @@ export class Musixmatch {
             query.push(['usertoken', this.token]);
         }
 
-        const t = Date.now().toString();
-        query.push(['t', t]);
 
         let url = new URL(this.ROOT_URL + action);
         query.forEach(([key, value]) => url.searchParams.set(key, value));
 
+        let cacheUrl = url.toString();
+        let cachedResponse = await this.cache.match(cacheUrl);
+        if (cachedResponse) {
+            console.log("cache hit for: " + cacheUrl);
+            return cachedResponse;
+        } else {
+            console.log("cache miss for: " + cacheUrl)
+        }
+
+        const t = Date.now().toString();
+        url.searchParams.set("t", t)
         let response;
         let loopCount = 0;
 
@@ -159,13 +171,29 @@ export class Musixmatch {
                 throw new Error("too many redirects");
             }
         } while ((response.status === 302 || response.status === 301));
-        {
+        if (response.body === null) {
+            return Promise.reject("Body is missing");
         }
 
-        return response;
+        let teeBody = response.body.tee();
+        response = new Response(teeBody[1], response); // make mutable
+        let keys = [...response.headers.keys()];
+        keys.forEach((key) => response.headers.delete(key));
+
+        if (action === 'token.get') {
+            response.headers.set("Cache-control", "public; max-age=43200");
+        } else {
+            response.headers.set("Cache-control", "public; max-age=86400");
+        }
+        awaitLists.add(this.cache.put(cacheUrl, response));
+
+        return new Response(teeBody[0], response);
     }
 
     async getToken(): Promise<void> {
+        if (this.token) {
+            return
+        }
         const response = await this._get('token.get', [['user_language', 'en']]);
         const data = await response.json() as MusixmatchResponse;
 
@@ -246,7 +274,6 @@ export class Musixmatch {
         const response = await this._get('matcher.track.get', query);
 
         const data = await response.json() as MusixmatchResponse;
-        console.log("Musixmatch Search: " + JSON.stringify(data, null, 2));
         if (data.message.header.status_code !== 200) {
             return null;
         }

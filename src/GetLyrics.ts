@@ -1,4 +1,5 @@
 import { Musixmatch } from './Musixmatch';
+import { awaitLists } from './index';
 
 const youtubeSnippetAPI = "https://www.googleapis.com/youtube/v3/videos";
 
@@ -22,8 +23,15 @@ type videoMetaType = {
 }
 
 const mx = new Musixmatch();
+const cache = caches.default;
 
 export async function getLyrics(request: Request<unknown, IncomingRequestCfProperties<unknown>>, env: Env): Promise<Response> {
+    let cachedResponse = await cache.match(request.url);
+    if (cachedResponse) {
+        console.log("Returning cached response");
+        return cachedResponse;
+    }
+
     let params = new URL(request.url).searchParams;
     console.log(params);
     let artist = params.get("artist");
@@ -106,14 +114,14 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     await tokenPromise;
     try {
         let lyrics = await mx.getLrc(artist, song, album);
-        console.log("Lyrics: " + JSON.stringify(lyrics));
         if (lyrics) {
             response.lyrics = lyrics.synced;
         }
     } catch (e) {
         console.error(e);
     }
-
-    return new Response(JSON.stringify(response));
+    let json = JSON.stringify(response);
+    awaitLists.add(cache.put(request.url,  new Response(json, { status: 400 })));
+    return new Response(json, { status: 400 });
 
 }

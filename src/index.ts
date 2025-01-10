@@ -12,7 +12,7 @@
  */
 import { getLyrics } from './GetLyrics';
 
-
+export let awaitLists = new Set<Promise<any>>();
 export default {
     async fetch(request, env, ctx): Promise<Response> {
         if (request.method === "OPTIONS") {
@@ -24,8 +24,10 @@ export default {
             });
         }
         let response = await getLyrics(request, env);
+        response = new Response(response.body, response);
         response.headers.set("content-type", "application/json");
         response.headers.set("Access-Control-Allow-Origin", "https://music.youtube.com");
+        await Promise.all(awaitLists);
         return response;
     },
 } satisfies ExportedHandler<Env>;
