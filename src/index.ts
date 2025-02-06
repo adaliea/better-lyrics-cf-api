@@ -27,7 +27,7 @@ export default {
         response = new Response(response.body, response);
         response.headers.set("content-type", "application/json");
         response.headers.set("Access-Control-Allow-Origin", "https://music.youtube.com");
-        response.headers.set("Cache-Control", "max-age=604800, stale-while-revalidate=604800");
+        // response.headers.set("Cache-Control", "max-age=604800, stale-while-revalidate=604800");
         await Promise.all(awaitLists);
         return response;
     },

@@ -95,6 +95,33 @@ export interface SecondaryGenres {
     music_genre_list: any[];
 }
 
+export interface RichSyncBody {
+    /**
+     * Start Time (s)
+     */
+    ts: number;
+    /**
+     * End Time (s)
+     */
+    te: number;
+    l:  TimedWord[];
+    /**
+     * Lyric Text (s)
+     */
+    x:  string;
+}
+
+export interface TimedWord {
+    /**
+     * Word (can be a space/similar)
+     */
+    c: string;
+    /**
+     * Offset in s from the lyric start time
+     */
+    o: number;
+}
+
 
 export class Musixmatch {
     private token: string | null = null;
@@ -213,28 +240,51 @@ export class Musixmatch {
     }
 
     private async getLrcWordByWord(trackId: string | number): Promise<LyricsResponse | null> {
+        const basicLrcPromise = this.getLrcById(trackId);
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
+
 
         if (!response.ok || data.message.header.status_code !== 200) {
             return null;
         }
 
-        const lrcRaw = JSON.parse(data.message.body.richsync.richsync_body);
+        const richSyncBody = JSON.parse(data.message.body.richsync.richsync_body) as RichSyncBody[];
+
         let lrcStr = '';
 
-        for (const item of lrcRaw) {
+        for (const item of richSyncBody) {
             lrcStr += `[${this.formatTime(item.ts)}] `;
 
             for (const lyric of item.l) {
-                const time = this.formatTime(item.ts + parseFloat(lyric.o));
+                const time = this.formatTime(item.ts + lyric.o);
                 lrcStr += `<${time}> ${lyric.c} `;
             }
 
-            const endTime = this.formatTime(parseFloat(item.te));
+            const endTime = this.formatTime(item.te);
             lrcStr += `<${endTime}>\n`;
         }
 
+        let offset = 0;
+
+        let basicLrc = await basicLrcPromise;
+        if (basicLrc && basicLrc.synced) {
+            let basicLrcOffset = [] as number[]
+            let parsedLrc = parseLrc(basicLrc.synced);
+            parsedLrc.forEach(({startTimeMs, words}, index) => {
+                if (richSyncBody.length > index) {
+                    basicLrcOffset.push(richSyncBody[index].ts - (startTimeMs / 1000));
+                    console.log(richSyncBody[index].x, words, richSyncBody[index].ts, (startTimeMs / 1000), richSyncBody[index].ts - (startTimeMs / 1000));
+                }
+            });
+
+            let { mean, variance } = meanAndVariance(basicLrcOffset)
+            console.log("mean, variance", mean, variance);
+            if (variance < 0.25) {
+                offset = mean;
+            }
+        }
+        lrcStr = `[offset:${addPlusSign(offset)}]\n` + lrcStr;
         return { synced: lrcStr, unsynced: null };
     }
 
@@ -289,5 +339,70 @@ export class Musixmatch {
             return this.getLrcById(trackId);
         }
         return null;
+    }
+}
+
+const possibleIdTags = ["ti", "ar", "al", "au", "lr", "length", "by", "offset", "re", "tool", "ve", "#"];
+
+function parseLrc(lrcText: string) {
+    const lines = lrcText.split("\n");
+    const result: { startTimeMs: number; words: string; }[] = [];
+    const idTags = new Map<string, string>
+
+    // Parse time in [mm:ss.xx] or <mm:ss.xx> format to milliseconds
+    function parseTime(timeStr: string) {
+        const match = timeStr.match(/(\d+):(\d+\.\d+)/);
+        if (!match) return null;
+        const minutes = parseInt(match[1], 10);
+        const seconds = parseFloat(match[2]);
+        return Math.round((minutes * 60 + seconds) * 1000);
+    }
+
+    // Process each line
+    lines.forEach(line => {
+        line = line.trim();
+
+        // Match ID tags [type:value]
+        const idTagMatch = line.match(/^\[(\w+):(.*)]$/);
+        if (idTagMatch && possibleIdTags.includes(idTagMatch[1])) {
+            idTags.set(idTagMatch[1], idTagMatch[2]);
+            return;
+        }
+
+        // Match time tags with lyrics
+        const timeTagRegex = /\[(\d+:\d+\.\d+)]/g;
+
+        const timeTags: number[] = [];
+        let match;
+        while ((match = timeTagRegex.exec(line)) !== null) {
+            timeTags.push(<number>parseTime(match[1]));
+        }
+
+        if (timeTags.length === 0) return; // Skip lines without time tags
+
+        const lyricPart = line.replace(timeTagRegex, "").trim();
+
+        // Extract enhanced lyrics (if available)
+        result.push({
+            startTimeMs: Math.max(...timeTags),
+            words: lyricPart,
+        });
+    });
+
+    return result;
+}
+
+function meanAndVariance(arr: number[]) {
+    const mean = arr.reduce((acc, val) => acc + val, 0) / arr.length;
+    const variance = arr.reduce((acc, val) => acc + (val - mean) ** 2, 0) / arr.length;
+    return { mean, variance };
+}
+
+
+function addPlusSign(num: number) {
+    if (num > 0) {
+        return `+${num}`;
+    } else {
+        return `${num}`;
     }
 }
