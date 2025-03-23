@@ -23,12 +23,19 @@ export default {
                 },
             });
         }
-        let response = await getLyrics(request, env);
-        response = new Response(response.body, response);
-        response.headers.set("content-type", "application/json");
-        response.headers.set("Access-Control-Allow-Origin", "https://music.youtube.com");
-        // response.headers.set("Cache-Control", "max-age=604800, stale-while-revalidate=604800");
-        await Promise.all(awaitLists);
-        return response;
+
+        try {
+            let response = await getLyrics(request, env);
+            response = new Response(response.body, response);
+            response.headers.set('content-type', 'application/json');
+            response.headers.set('Access-Control-Allow-Origin', 'https://music.youtube.com');
+            // response.headers.set("Cache-Control", "max-age=604800, stale-while-revalidate=604800");
+            await Promise.all(awaitLists);
+            return response;
+        } catch (e) {
+            console.error(e);
+        }
+
+        return new Response(null, { status: 400 });
     },
 } satisfies ExportedHandler<Env>;

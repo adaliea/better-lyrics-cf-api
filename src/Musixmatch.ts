@@ -1,5 +1,6 @@
 // Types for our responses and data
 import { awaitLists } from './index';
+import { Diff, diffArrays } from 'diff';
 
 interface LyricsResponse {
     synced: string | null;
@@ -123,6 +124,15 @@ export interface TimedWord {
 }
 
 
+export interface MatchingTimedWord {
+    /**
+     * Word (can be a space/similar)
+     */
+    word: string;
+    wordTime: number;
+}
+
+
 export class Musixmatch {
     private token: string | null = null;
     private cookies: { key: string, cookie: string }[] = [];
@@ -207,12 +217,15 @@ export class Musixmatch {
         let keys = [...response.headers.keys()];
         keys.forEach((key) => response.headers.delete(key));
 
-        if (action === 'token.get') {
-            response.headers.set("Cache-control", "public; max-age=43200");
-        } else {
-            response.headers.set("Cache-control", "public; max-age=86400");
+
+        if (response.status === 200) {
+            if (action === 'token.get') {
+                response.headers.set('Cache-control', 'public; max-age=600');
+            } else {
+                response.headers.set('Cache-control', 'public; max-age=86400');
+            }
+            awaitLists.add(this.cache.put(cacheUrl, response));
         }
-        awaitLists.add(this.cache.put(cacheUrl, response));
 
         return new Response(teeBody[0], response);
     }
@@ -224,9 +237,12 @@ export class Musixmatch {
         const response = await this._get('token.get', [['user_language', 'en']]);
         const data = await response.json() as MusixmatchResponse;
 
+        console.log('token status: ' + data.message.header.status_code);
         if (data.message.header.status_code === 401) {
             throw Error("Failed to get token");
         }
+
+        console.log('token: ' + data.message.body.user_token);
 
         this.token = data.message.body.user_token;
     }
@@ -243,6 +259,7 @@ export class Musixmatch {
         const basicLrcPromise = this.getLrcById(trackId);
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
+        console.log('response data' + data);
 
 
         if (!response.ok || data.message.header.status_code !== 200) {
@@ -252,6 +269,7 @@ export class Musixmatch {
         const richSyncBody = JSON.parse(data.message.body.richsync.richsync_body) as RichSyncBody[];
 
         let lrcStr = '';
+        let richSyncTokenArray: MatchingTimedWord[] = [];
 
         for (const item of richSyncBody) {
             lrcStr += `[${this.formatTime(item.ts)}] `;
@@ -259,6 +277,19 @@ export class Musixmatch {
             for (const lyric of item.l) {
                 const time = this.formatTime(item.ts + lyric.o);
                 lrcStr += `<${time}> ${lyric.c} `;
+
+                for (let i = 0; i < lyric.c.length; i++) {
+                    let char = lyric.c[i];
+                    if (i === 0) {
+                        richSyncTokenArray.push({
+                            word: char, wordTime: item.ts + lyric.o
+                        });
+                    } else {
+                        richSyncTokenArray.push({
+                            word: char, wordTime: -1
+                        });
+                    }
+                }
             }
 
             const endTime = this.formatTime(item.te);
@@ -271,16 +302,54 @@ export class Musixmatch {
         if (basicLrc && basicLrc.synced) {
             let basicLrcOffset = [] as number[]
             let parsedLrc = parseLrc(basicLrc.synced);
+
+            let parsedLrcTokenArray: MatchingTimedWord[] = [];
             parsedLrc.forEach(({startTimeMs, words}, index) => {
-                if (richSyncBody.length > index) {
-                    basicLrcOffset.push(richSyncBody[index].ts - (startTimeMs / 1000));
-                    console.log(richSyncBody[index].x, words, richSyncBody[index].ts, (startTimeMs / 1000), richSyncBody[index].ts - (startTimeMs / 1000));
+                for (let i = 0; i < words.length; i++) {
+                    let char = words[i];
+                    if (i === 0) {
+                        parsedLrcTokenArray.push({
+                            word: char, wordTime: startTimeMs / 1000.0
+                        });
+                    } else {
+                        parsedLrcTokenArray.push({
+                            word: char, wordTime: -1
+                        });
+                    }
+                }
+            });
+
+            let diff = diffArrays(parsedLrcTokenArray, richSyncTokenArray, { comparator: (left, right) => left.word.toLowerCase() === right.word.toLowerCase() });
+
+            let leftIndex = 0;
+            let rightIndex = 0;
+            diff.forEach(change => {
+                if (!change.removed && !change.added && change.value && change.count !== undefined) {
+                    for (let i = 0; i < change.count; i++) {
+                        let leftToken = parsedLrcTokenArray[leftIndex];
+                        let rightToken = richSyncTokenArray[rightIndex];
+
+                        if (leftToken.wordTime !== -1 && rightToken.wordTime !== -1) {
+                            basicLrcOffset.push(rightToken.wordTime - leftToken.wordTime);
+                            // console.log('found matching char with time', leftToken, rightToken);
+                        }
+                        leftIndex++;
+                        rightIndex++;
+                    }
+
+                    // console.log('found match', leftIndex, rightIndex, change.value.map(word => word.word).join('') + '\n');
+                } else {
+                    if (!change.added && change.count !== undefined) {
+                        leftIndex += change.count;
+                    }
+                    if (!change.removed && change.count !== undefined) {
+                        rightIndex += change.count;
+                    }
                 }
             });
 
             let { mean, variance } = meanAndVariance(basicLrcOffset)
-            console.log("mean, variance", mean, variance);
-            if (variance < 0.25) {
+            if (variance < 100) {
                 offset = mean;
             }
         }

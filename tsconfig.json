@@ -42,5 +42,9 @@
 		"skipLibCheck": true
 	},
 	"exclude": ["test"],
-	"include": ["worker-configuration.d.ts", "src/**/*.ts"]
+	"include": [
+      "worker-configuration.d.ts",
+      "src/**/*.ts",
+      "../../../AppData/Local/JetBrains/WebStorm2024.1/javascript/typings/node/20.15.0/node_modules/@types/node/globals.d.ts"
+    ]
 }
