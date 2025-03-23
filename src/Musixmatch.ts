@@ -5,6 +5,7 @@ import { Diff, diffArrays } from 'diff';
 interface LyricsResponse {
     synced: string | null;
     unsynced: string | null;
+    debugInfo: any;
 }
 
 interface MusixmatchResponse {
@@ -260,7 +261,7 @@ export class Musixmatch {
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
         console.log('response data' + data);
-
+        let mean, variance;
 
         if (!response.ok || data.message.header.status_code !== 200) {
             return null;
@@ -297,12 +298,13 @@ export class Musixmatch {
         }
 
         let offset = 0;
+        let basicLrcOffset = [] as number[];
+        let diffDebug: { op: string, text: string }[] = [];
 
         let basicLrc = await basicLrcPromise;
         if (basicLrc && basicLrc.synced) {
-            let basicLrcOffset = [] as number[]
-            let parsedLrc = parseLrc(basicLrc.synced);
 
+            let parsedLrc = parseLrc(basicLrc.synced);
             let parsedLrcTokenArray: MatchingTimedWord[] = [];
             parsedLrc.forEach(({startTimeMs, words}, index) => {
                 for (let i = 0; i < words.length; i++) {
@@ -336,25 +338,33 @@ export class Musixmatch {
                         leftIndex++;
                         rightIndex++;
                     }
-
+                    diffDebug.push({ op: 'MATCH', text: change.value.map(word => word.word).join('') + '\n' });
                     // console.log('found match', leftIndex, rightIndex, change.value.map(word => word.word).join('') + '\n');
                 } else {
                     if (!change.added && change.count !== undefined) {
                         leftIndex += change.count;
+                        diffDebug.push({ op: 'REMOVED', text: change.value.map(word => word.word).join('') + '\n' });
                     }
                     if (!change.removed && change.count !== undefined) {
                         rightIndex += change.count;
+                        diffDebug.push({ op: 'ADDED', text: change.value.map(word => word.word).join('') + '\n' });
                     }
                 }
             });
 
-            let { mean, variance } = meanAndVariance(basicLrcOffset)
-            if (variance < 100) {
+            let meanVar = meanAndVariance(basicLrcOffset);
+            mean = meanVar.mean;
+            variance = meanVar.variance;
+            if (variance < 10) {
                 offset = mean;
             }
         }
         lrcStr = `[offset:${addPlusSign(offset)}]\n` + lrcStr;
-        return { synced: lrcStr, unsynced: null };
+        return {
+            synced: lrcStr, unsynced: null, debugInfo: {
+                lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
+            }
+        };
     }
 
     private async getLrcById(trackId: string | number): Promise<LyricsResponse | null> {
@@ -375,7 +385,7 @@ export class Musixmatch {
 
         let lrcStr = data.message.body.subtitle.subtitle_body;
 
-        return { synced: lrcStr, unsynced: null };
+        return { synced: lrcStr, unsynced: null, debugInfo: null };
     }
 
     async getLrc(artist: string, track: string, album: string | null, enhanced: boolean): Promise<LyricsResponse | null> {

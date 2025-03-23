@@ -118,6 +118,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         parsedSongAndArtist,
         videoId,
         description,
+        debugInfo: null as any,
         lyrics: null as (String | null | undefined),
     };
     await tokenPromise;
@@ -125,6 +126,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         let lyrics = await mx.getLrc(artist, song, album, enhanced);
         if (lyrics) {
             response.lyrics = lyrics.synced;
+            response.debugInfo = lyrics.debugInfo;
         }
     } catch (e) {
         console.error(e);
