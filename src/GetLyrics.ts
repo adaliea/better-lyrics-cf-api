@@ -33,7 +33,6 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     }
 
     let params = new URL(request.url).searchParams;
-    console.log(params);
     let artist = params.get("artist");
     let song = params.get("song");
     let album: string | null = null;
@@ -46,13 +45,22 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
     }
 
+
+    let tokenPromise = mx.getToken();
+
     let snippetUrl = new URL(youtubeSnippetAPI);
     snippetUrl.searchParams.set("id", videoId);
     snippetUrl.searchParams.set("key", env.GOOGLE_API_KEY);
     snippetUrl.searchParams.set("part", "snippet");
 
-    let tokenPromise = mx.getToken();
-    let videoMeta: videoMetaType = await fetch(snippetUrl).then(response => response.json());
+    let videoMeta: videoMetaType | undefined = await cache.match(snippetUrl).then(response => response?.json());
+    if (!videoMeta) {
+        videoMeta = await fetch(snippetUrl).then(response => {
+            awaitLists.add(cache.put(response.url, response.clone()));
+            return response.json();
+        });
+    }
+
     if (videoMeta && videoMeta.items && videoMeta.items.length > 0
         && videoMeta.items[0] && videoMeta.items[0].snippet) {
         let snippet = videoMeta.items[0].snippet;
@@ -121,8 +129,20 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     } catch (e) {
         console.error(e);
     }
+
+
     let json = JSON.stringify(response);
-    awaitLists.add(cache.put(request.url,  new Response(json, { status: 200 })));
+
+    let cacheableResponse = new Response(json, { status: 200 });
+    if (response.lyrics) {
+        cacheableResponse.headers.set("Cache-control", "public; max-age=604800");
+    } else {
+        // cache the request only for a short time
+        cacheableResponse.headers.set("Cache-control", "public; max-age=600");
+    }
+    awaitLists.add(cache.put(request.url, cacheableResponse));
+
+
     return new Response(json, { status: 200 });
 
 }
