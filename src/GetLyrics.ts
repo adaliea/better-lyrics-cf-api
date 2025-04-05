@@ -136,8 +136,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         debugInfo: null as any,
         lyrics: null as (String | null | undefined),
     };
-    await tokenPromise;
     try {
+        await tokenPromise;
         let lyrics = await mx.getLrc(artist, song, album, enhanced);
         if (lyrics) {
             response.lyrics = lyrics.synced;

@@ -141,11 +141,7 @@ export class Musixmatch {
 
     private cache = caches.default;
 
-    private async _get(action: string, query: [string, string][]): Promise<Response> {
-        if (action !== 'token.get' && !this.token) {
-            await this.getToken();
-        }
-
+    private async _get(action: string, query: [string, string][], noCache = false): Promise<Response> {
         query.push(['app_id', 'web-desktop-app-v1.0']);
         if (this.token) {
             query.push(['usertoken', this.token]);
@@ -158,8 +154,13 @@ export class Musixmatch {
         let cacheUrl = url.toString();
         let cachedResponse = await this.cache.match(cacheUrl);
         if (cachedResponse) {
-            console.log("cache hit for: " + cacheUrl);
-            return cachedResponse;
+            if (noCache) {
+                console.log('deleting cache for: ' + cacheUrl);
+                awaitLists.add(this.cache.delete(cacheUrl));
+            } else {
+                console.log('cache hit for: ' + cacheUrl);
+                return cachedResponse;
+            }
         } else {
             console.log("cache miss for: " + cacheUrl)
         }
@@ -184,7 +185,7 @@ export class Musixmatch {
                 }).join(";");
             }
 
-            console.log(headers["Cookie"]);
+            console.log('cookie', headers['Cookie']);
 
             response = await fetch(url, {
                 headers,
@@ -221,7 +222,7 @@ export class Musixmatch {
 
         if (response.status === 200) {
             if (action === 'token.get') {
-                response.headers.set('Cache-control', 'public; max-age=600');
+                response.headers.set('Cache-control', 'public; max-age=3600');
             } else {
                 response.headers.set('Cache-control', 'public; max-age=86400');
             }
@@ -232,10 +233,13 @@ export class Musixmatch {
     }
 
     async getToken(): Promise<void> {
+        let response;
         if (this.token) {
-            return
+            this.token = null;
+            response = await this._get('token.get', [['user_language', 'en']], false);
+        } else {
+            response = await this._get('token.get', [['user_language', 'en']]);
         }
-        const response = await this._get('token.get', [['user_language', 'en']]);
         const data = await response.json() as MusixmatchResponse;
 
         console.log('token status: ' + data.message.header.status_code);
@@ -260,7 +264,7 @@ export class Musixmatch {
         const basicLrcPromise = this.getLrcById(trackId);
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
-        console.log('response data' + data);
+        console.log('response data' + JSON.stringify(data));
         let mean, variance;
 
         if (!response.ok || data.message.header.status_code !== 200) {
@@ -402,8 +406,17 @@ export class Musixmatch {
         }
         const response = await this._get('matcher.track.get', query);
 
-        const data = await response.json() as MusixmatchResponse;
+        let data = await response.json() as MusixmatchResponse;
+        console.log(data, data.message.header.status_code);
+        if (data.message.header.status_code === 401) {
+            this.cookies = [];
+            await this.getToken();
+            // try again
+            const response = await this._get('matcher.track.get', query);
+            data = await response.json() as MusixmatchResponse;
+        }
         if (data.message.header.status_code !== 200) {
+            console.error('didn\'t get 200 for message', data.message.header.status_code);
             return null;
         }
 
