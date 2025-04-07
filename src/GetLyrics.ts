@@ -21,6 +21,7 @@ type videoMetaType = {
             channelType: string
             defaultLanguage: string,
             tags: string[],
+            channelTitle: string,
         }
     }]
 }
@@ -81,7 +82,14 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 song = splitSongAndArtist[0].trim();
 
                 splitSongAndArtist.shift();
-                artist = splitSongAndArtist.map(artist => artist.trim()).join(' & ');
+                if (splitSongAndArtist.length > 3) {
+                    // We have a lot of artists. This probably means writers/etc are also here. Just return the first one in this case.
+                    if (snippet.channelTitle && snippet.channelTitle.endsWith('- Topic')) {
+                        artist = snippet.channelTitle.substring(0, snippet.channelTitle.length - 7).trim();
+                    }
+                } else {
+                    artist = splitSongAndArtist.map(artist => artist.trim()).join(' & ');
+                }
 
             }
         }
