@@ -296,17 +296,21 @@ export class Musixmatch {
                     }
                 }
             }
+            richSyncTokenArray.push({
+                word: '\n', wordTime: -1
+            });
 
             const endTime = this.formatTime(item.te);
             lrcStr += `<${endTime}>\n`;
         }
 
-        let offset = 0;
-        let basicLrcOffset = [] as number[];
-        let diffDebug: { op: string, text: string }[] = [];
+
 
         let basicLrc = await basicLrcPromise;
         if (basicLrc && basicLrc.synced) {
+            let offset = 0;
+            let basicLrcOffset = [] as number[];
+            let diffDebug: { op: string, text: string }[] = [];
 
             let parsedLrc = parseLrc(basicLrc.synced);
             let parsedLrcTokenArray: MatchingTimedWord[] = [];
@@ -322,6 +326,11 @@ export class Musixmatch {
                             word: char, wordTime: -1
                         });
                     }
+                }
+                if (index < parsedLrc.length - 1) {
+                    parsedLrcTokenArray.push({
+                        word: '\n', wordTime: -1
+                    });
                 }
             });
 
@@ -342,16 +351,16 @@ export class Musixmatch {
                         leftIndex++;
                         rightIndex++;
                     }
-                    diffDebug.push({ op: 'MATCH', text: change.value.map(word => word.word).join('') + '\n' });
+                    diffDebug.push({ op: 'MATCH', text: change.value.map(word => word.word).join('') });
                     // console.log('found match', leftIndex, rightIndex, change.value.map(word => word.word).join('') + '\n');
                 } else {
                     if (!change.added && change.count !== undefined) {
                         leftIndex += change.count;
-                        diffDebug.push({ op: 'REMOVED', text: change.value.map(word => word.word).join('') + '\n' });
+                        diffDebug.push({ op: 'REMOVED', text: change.value.map(word => word.word).join('') });
                     }
                     if (!change.removed && change.count !== undefined) {
                         rightIndex += change.count;
-                        diffDebug.push({ op: 'ADDED', text: change.value.map(word => word.word).join('') + '\n' });
+                        diffDebug.push({ op: 'ADDED', text: change.value.map(word => word.word).join('') });
                     }
                 }
             });
@@ -359,16 +368,30 @@ export class Musixmatch {
             let meanVar = meanAndVariance(basicLrcOffset);
             mean = meanVar.mean;
             variance = meanVar.variance;
-            if (variance < 10) {
-                offset = mean;
+            if (variance < 1.5) {
+                lrcStr = `[offset:${addPlusSign(offset)}]\n` + lrcStr;
+                return {
+                    synced: lrcStr, unsynced: null, debugInfo: {
+                        lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
+                    }
+                };
+            } else {
+                return {
+                    synced: basicLrc.synced, unsynced: null, debugInfo: {
+                        lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
+                        comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
+                    }
+                };
             }
         }
-        lrcStr = `[offset:${addPlusSign(offset)}]\n` + lrcStr;
+
         return {
             synced: lrcStr, unsynced: null, debugInfo: {
-                lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
+                comment: 'no synced basic lyrics found'
             }
         };
+
+
     }
 
     private async getLrcById(trackId: string | number): Promise<LyricsResponse | null> {
