@@ -312,7 +312,6 @@ export class Musixmatch {
 
         let basicLrc = await basicLrcPromise;
         if (basicLrc && basicLrc.synced) {
-            let offset = 0;
             let basicLrcOffset = [] as number[];
             let diffDebug: { op: string, text: string }[] = [];
 
@@ -373,7 +372,7 @@ export class Musixmatch {
             mean = meanVar.mean;
             variance = meanVar.variance;
             if (variance < 1.5) {
-                lrcStr = `[offset:${addPlusSign(offset)}]\n` + lrcStr;
+                lrcStr = `[offset:${addPlusSign(mean)}]\n` + lrcStr;
                 return {
                     richSynced: lrcStr, synced: null, unsynced: null, debugInfo: {
                         lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
