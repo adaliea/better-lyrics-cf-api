@@ -1,12 +1,9 @@
 // Types for our responses and data
 import { awaitLists } from './index';
 import { Diff, diffArrays } from 'diff';
+import { LyricsResponse, parseLrc } from './LyricUtils';
 
-interface LyricsResponse {
-    synced: string | null;
-    unsynced: string | null;
-    debugInfo: any;
-}
+
 
 interface MusixmatchResponse {
     message: Message;
@@ -260,8 +257,15 @@ export class Musixmatch {
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${hundredths.toString().padStart(2, '0')}`;
     }
 
-    private async getLrcWordByWord(trackId: string | number): Promise<LyricsResponse | null> {
-        const basicLrcPromise = this.getLrcById(trackId);
+    private async getLrcWordByWord(trackId: string | number, lrcLyrics: Promise<LyricsResponse | null> | null):
+        Promise<LyricsResponse | null> {
+
+        let basicLrcPromise: Promise<LyricsResponse | null>;
+        if (lrcLyrics !== null) {
+            basicLrcPromise = lrcLyrics;
+        } else {
+            basicLrcPromise = this.getLrcById(trackId);
+        }
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
         console.log('response data' + JSON.stringify(data));
@@ -371,22 +375,32 @@ export class Musixmatch {
             if (variance < 1.5) {
                 lrcStr = `[offset:${addPlusSign(offset)}]\n` + lrcStr;
                 return {
-                    synced: lrcStr, unsynced: null, debugInfo: {
+                    richSynced: lrcStr, synced: null, unsynced: null, debugInfo: {
                         lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
                     }
                 };
             } else {
-                return {
-                    synced: basicLrc.synced, unsynced: null, debugInfo: {
-                        lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
-                        comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
-                    }
-                };
+                if (lrcLyrics) {
+                    return {
+                        richSynced: null, synced: null, unsynced: null, debugInfo: {
+                            lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
+                            comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
+                        }
+                    };
+                } else {
+                    return {
+                        richSynced: null, synced: basicLrc.synced, unsynced: null, debugInfo: {
+                            lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
+                            comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
+                        }
+                    };
+                }
+
             }
         }
 
         return {
-            synced: lrcStr, unsynced: null, debugInfo: {
+            richSynced: lrcStr, synced: null, unsynced: null, debugInfo: {
                 comment: 'no synced basic lyrics found'
             }
         };
@@ -412,10 +426,11 @@ export class Musixmatch {
 
         let lrcStr = data.message.body.subtitle.subtitle_body;
 
-        return { synced: lrcStr, unsynced: null, debugInfo: null };
+        return { richSynced: null, synced: lrcStr, unsynced: null, debugInfo: null };
     }
 
-    async getLrc(artist: string, track: string, album: string | null, enhanced: boolean): Promise<LyricsResponse | null> {
+    async getLrc(artist: string, track: string, album: string | null, enhanced: boolean, lrcLyrics: Promise<LyricsResponse | null> | null):
+        Promise<LyricsResponse | null> {
 
         let query: [string, string][] = [
             ['q_track', track],
@@ -449,7 +464,7 @@ export class Musixmatch {
         const hasLyrics = data.message.body.track.has_lyrics;
         console.log('hasRichLyrics', hasRichLyrics, "hasSubtitles", hasSubtitles, "hasLyrics", hasLyrics);
         if (hasRichLyrics && enhanced) {
-            return this.getLrcWordByWord(trackId);
+            return this.getLrcWordByWord(trackId, lrcLyrics);
         } else if (hasSubtitles) {
             return this.getLrcById(trackId);
         }
@@ -457,55 +472,7 @@ export class Musixmatch {
     }
 }
 
-const possibleIdTags = ["ti", "ar", "al", "au", "lr", "length", "by", "offset", "re", "tool", "ve", "#"];
 
-function parseLrc(lrcText: string) {
-    const lines = lrcText.split("\n");
-    const result: { startTimeMs: number; words: string; }[] = [];
-    const idTags = new Map<string, string>
-
-    // Parse time in [mm:ss.xx] or <mm:ss.xx> format to milliseconds
-    function parseTime(timeStr: string) {
-        const match = timeStr.match(/(\d+):(\d+\.\d+)/);
-        if (!match) return null;
-        const minutes = parseInt(match[1], 10);
-        const seconds = parseFloat(match[2]);
-        return Math.round((minutes * 60 + seconds) * 1000);
-    }
-
-    // Process each line
-    lines.forEach(line => {
-        line = line.trim();
-
-        // Match ID tags [type:value]
-        const idTagMatch = line.match(/^\[(\w+):(.*)]$/);
-        if (idTagMatch && possibleIdTags.includes(idTagMatch[1])) {
-            idTags.set(idTagMatch[1], idTagMatch[2]);
-            return;
-        }
-
-        // Match time tags with lyrics
-        const timeTagRegex = /\[(\d+:\d+\.\d+)]/g;
-
-        const timeTags: number[] = [];
-        let match;
-        while ((match = timeTagRegex.exec(line)) !== null) {
-            timeTags.push(<number>parseTime(match[1]));
-        }
-
-        if (timeTags.length === 0) return; // Skip lines without time tags
-
-        const lyricPart = line.replace(timeTagRegex, "").trim();
-
-        // Extract enhanced lyrics (if available)
-        result.push({
-            startTimeMs: Math.max(...timeTags),
-            words: lyricPart,
-        });
-    });
-
-    return result;
-}
 
 function meanAndVariance(arr: number[]) {
     const mean = arr.reduce((acc, val) => acc + val, 0) / arr.length;

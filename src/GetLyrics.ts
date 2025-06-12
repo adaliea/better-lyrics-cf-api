@@ -1,5 +1,7 @@
 import { Musixmatch } from './Musixmatch';
 import { awaitLists } from './index';
+import { getLyricLibLyrics, LrcLibResponse } from './LrcLib';
+import { LyricsResponse } from './LyricUtils';
 
 const youtubeSnippetAPI = "https://www.googleapis.com/youtube/v3/videos";
 
@@ -45,6 +47,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let videoId = params.get("videoId");
     let description: string | null = null;
     let enhanced = (params.get("enhanced") || "false").toLowerCase() === "true";
+    let useLrcLib = (params.get('useLrcLib') || 'false').toLowerCase() === 'true';
 
     if (!videoId) {
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
@@ -143,16 +146,37 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         description,
         debugInfo: null as any,
         lyrics: null as (String | null | undefined),
+        musixmatchWordByWordLyrics: null as any,
+        musixmatchSyncedLyrics: null as any,
+        lrclibSyncedLyrics: null as any,
+        lrclibPlainLyrics: null as any
     };
+    let lrcLibLyricsPromise: Promise<LyricsResponse | null> | null = null;
+    if (useLrcLib) {
+        lrcLibLyricsPromise = getLyricLibLyrics(artist, song, album, duration);
+    }
+
     try {
         await tokenPromise;
-        let lyrics = await mx.getLrc(artist, song, album, enhanced);
-        if (lyrics) {
-            response.lyrics = lyrics.synced;
-            response.debugInfo = lyrics.debugInfo;
+        let musixmatchLyrics = await mx.getLrc(artist, song, album, enhanced, lrcLibLyricsPromise);
+        if (musixmatchLyrics) {
+            if (musixmatchLyrics.richSynced) {
+                response.lyrics = musixmatchLyrics.richSynced;
+            } else {
+                response.lyrics = musixmatchLyrics.synced;
+            }
+            response.musixmatchWordByWordLyrics = musixmatchLyrics.richSynced;
+            response.musixmatchSyncedLyrics = musixmatchLyrics.synced;
+            response.debugInfo = musixmatchLyrics.debugInfo;
         }
     } catch (e) {
         console.error(e);
+    }
+
+    if (useLrcLib) {
+        const lrcLibLyrics = await lrcLibLyricsPromise;
+        response.lrclibSyncedLyrics = lrcLibLyrics?.synced;
+        response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
     }
 
 
