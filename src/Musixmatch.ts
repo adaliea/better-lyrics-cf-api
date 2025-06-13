@@ -372,7 +372,7 @@ export class Musixmatch {
             mean = meanVar.mean;
             variance = meanVar.variance;
             if (variance < 1.5) {
-                lrcStr = `[offset:${addPlusSign(mean)}]\n` + lrcStr;
+                lrcStr = `[offset:${addPlusSign(-mean)}]\n` + lrcStr;
                 return {
                     richSynced: lrcStr, synced: null, unsynced: null, debugInfo: {
                         lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
