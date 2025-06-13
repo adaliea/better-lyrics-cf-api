@@ -260,11 +260,13 @@ export class Musixmatch {
     private async getLrcWordByWord(trackId: string | number, lrcLyrics: Promise<LyricsResponse | null> | null):
         Promise<LyricsResponse | null> {
 
+
+        let musixmatchBasicLyrics: Promise<LyricsResponse | null> = this.getLrcById(trackId);
         let basicLrcPromise: Promise<LyricsResponse | null>;
         if (lrcLyrics !== null) {
             basicLrcPromise = lrcLyrics;
         } else {
-            basicLrcPromise = this.getLrcById(trackId);
+            basicLrcPromise = musixmatchBasicLyrics;
         }
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
@@ -374,21 +376,21 @@ export class Musixmatch {
             if (variance < 1.5) {
                 lrcStr = `[offset:${addPlusSign(-mean)}]\n` + lrcStr;
                 return {
-                    richSynced: lrcStr, synced: null, unsynced: null, debugInfo: {
+                    richSynced: lrcStr, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
                         lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug }
                     }
                 };
             } else {
                 if (lrcLyrics) {
                     return {
-                        richSynced: null, synced: null, unsynced: null, debugInfo: {
+                        richSynced: null, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
                             lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
                             comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
                         }
                     };
                 } else {
                     return {
-                        richSynced: null, synced: basicLrc.synced, unsynced: null, debugInfo: {
+                        richSynced: null, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
                             lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
                             comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
                         }

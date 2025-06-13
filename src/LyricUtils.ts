@@ -50,7 +50,7 @@ export function parseLrc(lrcText: string) {
 
 export interface LyricsResponse {
     richSynced: string | null;
-    synced: string | null;
+    synced: string | null | undefined;
     unsynced: string | null;
     debugInfo: any;
 }
