@@ -39,8 +39,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     }
 
     let params = new URL(request.url).searchParams;
-    let artist = params.get("artist");
-    let song = params.get("song");
+    let artist: string | null | undefined = params.get('artist');
+    let song: string | null | undefined = params.get('song');
     let album: string | null = null;
     let duration = params.get('duration');
     let parsedSongAndArtist: string | null = null;
@@ -85,6 +85,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 song = splitSongAndArtist[0].trim();
 
                 splitSongAndArtist.shift();
+
                 if (splitSongAndArtist.length > 3) {
                     // We have a lot of artists. This probably means writers/etc are also here. Just return the first one in this case.
                     if (snippet.channelTitle && snippet.channelTitle.endsWith('- Topic')) {
@@ -93,9 +94,12 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 } else {
                     artist = splitSongAndArtist.map(artist => artist.trim()).join(' & ');
                 }
-
             }
         }
+
+        song = song?.replace(/[\(\[].*?[\)\]]/g, '');
+        artist = artist?.replace(/[\(\[].*?[\)\]]/g, '');
+
 
         let contentDetails = videoMeta.items[0].contentDetails;
         if (contentDetails && contentDetails.duration) {
