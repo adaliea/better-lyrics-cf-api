@@ -53,6 +53,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
     }
 
+    song = cleanupText(song);
+    artist = cleanupText(artist);
 
     let tokenPromise = mx.getToken();
 
@@ -86,20 +88,25 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
 
                 splitSongAndArtist.shift();
 
+                // Check that the original artist is in the metadata list
+                let newArtist = '';
                 if (splitSongAndArtist.length > 3) {
                     // We have a lot of artists. This probably means writers/etc are also here. Just return the first one in this case.
                     if (snippet.channelTitle && snippet.channelTitle.endsWith('- Topic')) {
-                        artist = snippet.channelTitle.substring(0, snippet.channelTitle.length - 7).trim();
+                        newArtist = snippet.channelTitle.substring(0, snippet.channelTitle.length - 7).trim();
                     }
                 } else {
-                    artist = splitSongAndArtist.map(artist => artist.trim()).join(' & ');
+                    newArtist = splitSongAndArtist.map(artist => artist.trim()).join(' & ');
+                }
+
+                if (!artist || newArtist.includes(artist)) {
+                    artist = newArtist;
                 }
             }
+
+            song = cleanupText(song);
+            artist = cleanupText(artist);
         }
-
-        song = song?.replace(/[\(\[].*?[\)\]]/g, '');
-        artist = artist?.replace(/[\(\[].*?[\)\]]/g, '');
-
 
         let contentDetails = videoMeta.items[0].contentDetails;
         if (contentDetails && contentDetails.duration) {
@@ -197,5 +204,38 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
 
 
     return new Response(json, { status: 200 });
-
 }
+
+
+function cleanupText(text: string | null | undefined): string | null | undefined {
+    if (!text) return text;
+
+    // Common language-related terms to preserve
+    const languageTerms = [
+        'ver', 'version', 'remix',
+        'english', 'korean', 'japanese', 'chinese',
+        'jp', 'kr', 'cn', 'en',
+        '日本語', '한국어', '中文', 'español',
+        'instrumental'
+    ];
+    const languagePattern = new RegExp(languageTerms.join('|'), 'i');
+
+    let result = text;
+    let lastResult = '';
+
+    while (result !== lastResult) {
+        lastResult = result;
+        result = result
+            .replace(/(?!^|\s)\(([^()]*)\)|\[([^\[\]]*)\]/g, (match, p1, p2) => {
+                // p1 is for parentheses content, p2 is for bracket content
+                const content = p1 || p2;
+                // Keep the match if it contains language-related terms
+                return languagePattern.test(content) ? match : '';
+            })
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    return result;
+}
+
