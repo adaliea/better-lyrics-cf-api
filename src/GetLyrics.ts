@@ -194,8 +194,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let json = JSON.stringify(response);
 
     let cacheableResponse = new Response(json, { status: 200 });
-    if (response.lyrics) {
-        cacheableResponse.headers.set("Cache-control", "public; max-age=604800");
+    if (response.musixmatchSyncedLyrics || response.lrclibSyncedLyrics) {
+        cacheableResponse.headers.set('Cache-control', 'public; max-age=259200');
     } else {
         // cache the request only for a short time
         cacheableResponse.headers.set("Cache-control", "public; max-age=600");
