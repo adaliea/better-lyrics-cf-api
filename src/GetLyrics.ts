@@ -53,8 +53,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
     }
 
-    song = cleanupText(song);
-    artist = cleanupText(artist);
+    // song = cleanupText(song);
+    // artist = cleanupText(artist);
 
     let tokenPromise = mx.getToken();
 
@@ -104,8 +104,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 }
             }
 
-            song = cleanupText(song);
-            artist = cleanupText(artist);
+            // song = cleanupText(song);
+            // artist = cleanupText(artist);
         }
 
         let contentDetails = videoMeta.items[0].contentDetails;
@@ -216,7 +216,8 @@ function cleanupText(text: string | null | undefined): string | null | undefined
         'english', 'korean', 'japanese', 'chinese',
         'jp', 'kr', 'cn', 'en',
         '日本語', '한국어', '中文', 'español',
-        'instrumental'
+        'instrumental', 'vault', 'fast', 'slow',
+        'with', 'from', 'acoustic'
     ];
     const languagePattern = new RegExp(languageTerms.join('|'), 'i');
 
@@ -226,15 +227,18 @@ function cleanupText(text: string | null | undefined): string | null | undefined
     while (result !== lastResult) {
         lastResult = result;
         result = result
-            .replace(/(?!^|\s)\(([^()]*)\)|\[([^\[\]]*)\]/g, (match, p1, p2) => {
-                // p1 is for parentheses content, p2 is for bracket content
-                const content = p1 || p2;
-                // Keep the match if it contains language-related terms
+            .replace(/\[([^\[\]]*)\]/g, (match, content) => {
+                // If it contains language-related terms, keep the brackets
+                return languagePattern.test(content) ? match : `(${content})`;
+            })
+            .replace(/(?!^|\s)\(([^()]*)\)/g, (match, content) => {
+                // Handle existing parentheses
                 return languagePattern.test(content) ? match : '';
             })
             .replace(/\s+/g, ' ')
             .trim();
     }
+
 
     return result;
 }
