@@ -60,8 +60,6 @@ When a request is made to the worker:
       responses without lyrics are cached for 10 minutes (`max-age=600`).
     * The `index.ts` worker sets appropriate HTTP headers (including `Access-Control-Allow-Origin`) and returns the
       response.
-5. **Asynchronous Operations**: The worker uses an `awaitLists` mechanism (a `Set` of Promises) to track asynchronous
-   tasks, primarily cache `put` operations, ensuring they are initiated before the main response is returned.
 
 ## API Endpoint
 
