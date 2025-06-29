@@ -1,8 +1,8 @@
 # Cloudflare Lyrics Fetcher Worker
 
 This Cloudflare Worker fetches song lyrics by utilizing the YouTube API (for metadata from video IDs) and the Musixmatch
-API (for actual lyrics). It's designed to infer song details from a YouTube video ID and then retrieve corresponding
-lyrics, with an option for enhanced, word-by-word synchronized lyrics.
+and LrcLib APIs (for actual lyrics). It's designed to infer song details from a YouTube video ID and then retrieve
+corresponding lyrics, with an option for enhanced, word-by-word synchronized lyrics from Musixmatch.
 
 ## Features
 
@@ -10,6 +10,7 @@ lyrics, with an option for enhanced, word-by-word synchronized lyrics.
 * **Metadata Extraction**: Fetches video details from the YouTube API to determine song title, artist, album (if
   possible), and duration.
 * **Musixmatch Integration**: Communicates with the Musixmatch API to find and retrieve lyrics.
+* **LrcLib Integration**: Optionally uses the LrcLib API as an alternative or supplementary source for lyrics.
 * **LRC Format Lyrics**: Provides lyrics in the standard LRC (timed lyrics) format.
 * **Enhanced Word-by-Word Sync**: Offers an "enhanced" mode that attempts to provide more granular, word-by-word
   synchronized lyrics from Musixmatch's "richsync" feature. This includes a timestamp alignment process by comparing
@@ -26,6 +27,7 @@ When a request is made to the worker:
 2. **Parameter Processing (`GetLyrics.ts`)**:
     * The core logic resides in `GetLyrics.ts`. It first checks a cache for a response to the identical request URL.
     * A `videoId` (YouTube Video ID) is a **required** query parameter.
+    * The `useLrcLib` parameter can be used to enable fetching from LrcLib.
     * **YouTube Metadata Fetch**: Using the `videoId` and a `GOOGLE_API_KEY` (configured in `wrangler.toml`), it queries
       the Google YouTube Data API v3 for video details (title, description, duration, channel title). These API
       responses are cached.
@@ -34,7 +36,8 @@ When a request is made to the worker:
       YouTube)
     * If essential song details (song title and artist) cannot be determined, it returns a 400 error if they aren't
       provided in the API call.
-3. **Musixmatch API Interaction (`Musixmatch.ts`)**:
+3. **Lyric Fetching (`Musixmatch.ts`, `LrcLib.ts`)**:
+    * If `useLrcLib` is true, a request is sent to LrcLib to fetch lyrics.
     * The `Musixmatch.ts` class manages all communication with the Musixmatch API.
     * **Token Management**: It handles the acquisition and refreshing of a `usertoken` required for Musixmatch API
       calls. Tokens and API responses are cached. It also manages cookies returned by Musixmatch.
@@ -42,18 +45,19 @@ When a request is made to the worker:
       from YouTube metadata or provided as optional query parameters).
     * **Lyric Fetching**:
         * If the `enhanced=true` query parameter is present and Musixmatch has "richsync" (word-by-word) data for the
-          track, it fetches this data. It also fetches the standard LRC. An alignment process using `diffArrays`
-          compares character sequences and timings to calculate an `[offset:...]` for the richsync LRC, aiming for
-          better accuracy.
+          track, it fetches this data. It also fetches the standard LRC. An alignment process using `diffArrays`compares
+          character sequences and timings to calculate an `[offset:...]` for the richsync LRC, aiming for better
+          accuracy.
         * If `enhanced=false` or richsync is unavailable, but standard LRC subtitles are available, it fetches those.
         * If no lyrics are found, the lyrics field in the response will be `null`.
 4. **Response Generation (`GetLyrics.ts` & `index.ts`)**:
-    * A JSON response is constructed containing the determined song `artist`, `song` title, `album` (if
-      found), `duration`, the `videoId`, the original YouTube `description` (if relevant), the fetched `lyrics` (as an
-      LRC formatted string or `null`), and `debugInfo` (which can include lyric matching statistics if enhanced mode was
+    * A JSON response is constructed containing the determined song `artist`, `song` title, `album` (if found),
+      `duration`, the `videoId`, the original YouTube `description` (if relevant), the fetched `lyrics` (as an LRC
+      formatted string or `null`), and `debugInfo` (which can include lyric matching statistics if enhanced mode was
       used).
-    * This final response is cached. Responses containing lyrics are cached for a longer duration (e.g., 7 days) than
-      responses without lyrics (e.g., 10 minutes).
+    * The response will also contain separate fields for Musixmatch and LrcLib lyrics if `useLrcLib` is enabled.
+    * This final response is cached. Responses containing lyrics are cached for up to 3 days (`max-age=259200`), while
+      responses without lyrics are cached for 10 minutes (`max-age=600`).
     * The `index.ts` worker sets appropriate HTTP headers (including `Access-Control-Allow-Origin`) and returns the
       response.
 5. **Asynchronous Operations**: The worker uses an `awaitLists` mechanism (a `Set` of Promises) to track asynchronous
@@ -78,10 +82,11 @@ The worker exposes a single GET endpoint.
 * `duration` (string, optional): The duration of the song in seconds. Can be inferred from `videoId`.
 * `enhanced` (boolean, optional, default: `false`): If set to `true`, the worker will attempt to fetch word-by-word
   synchronized lyrics and perform timestamp alignment.
+* `useLrcLib` (boolean, optional, default: `false`): If set to `true`, the worker will also fetch lyrics from LrcLib.
 
 ### Example Request:
 
-`GET /?song=Almost+Forgot&artist=Against+The+Current&duration=208&videoId=Y4gOQSZg5bQ&enhanced=true`
+`GET /?song=Almost+Forgot&artist=Against+The+Current&duration=208&videoId=Y4gOQSZg5bQ&enhanced=true&useLrcLib=true`
 
 ### Success Response (200 OK):
 
@@ -93,9 +98,24 @@ The worker exposes a single GET endpoint.
     "duration": "209",
     "parsedSongAndArtist": "Almost Forgot · Against The Current",
     "videoId": "Y4gOQSZg5bQ",
-    "description": "Provided to YouTube by Fueled By Ramen\n\nAlmost Forgot · Against The Current\n\nPast Lives\n\n℗ 2018 Fueled By Ramen LLC\n\nEditor, Engineer: Andrew Goldsein\nAdditional Guitar: Andrew Goldsein\nAdditional Keyboards: Andrew Goldsein\nAdditional Programming: Andrew Goldsein\nAdditional Vocals: Andrew Goldsein\nProducer: Andrew Goldstein\nMasterer: Chris Gehringer\nVocals: Chrissy Constanza\nGuitar: Dan Gow\nMixer: Neal Avron\nAdditional Vocals: Steph Jones\nBass, Drums: Will Ferri\nWriter: Andrew Goldstein\nWriter: Brittany M. Amaradio\nWriter: Christina Costanza\nWriter: Daniel Gow\nWriter: Stephanie Jones\nWriter: William Ferri\n\nAuto-generated by YouTube.",
-    "debugInfo": null,
-    "lyrics": "[00:00.24] Oh, oh, oh\n[00:02.51] Oh, oh, oh\n[00:05.07] Oh, oh, oh\n[00:08.29] \n[00:10.52] Sometimes I get confused\n[00:15.02] 'Bout how it all went down\n[00:18.84] When I feel like I miss you\n ..."
+    "description": "Provided to YouTube by Fueled By Ramen...",
+    "debugInfo": {
+        "lyricMatchingStats": {
+            "mean": -0.015,
+            "variance": 0.000025,
+            "samples": [
+                ...
+            ],
+            "diff": [
+                ...
+            ]
+        }
+    },
+    "lyrics": "[offset:-0.015]\n[00:00.24] Oh, oh, oh...",
+    "musixmatchWordByWordLyrics": "[offset:-0.015]\n[00:00.24] Oh, oh, oh...",
+    "musixmatchSyncedLyrics": "[00:00.24]Oh, oh, oh...",
+    "lrclibSyncedLyrics": "[00:00.24]Oh, oh, oh...",
+    "lrclibPlainLyrics": "Oh, oh, oh..."
 }
 ```
 
@@ -126,15 +146,19 @@ or
 ### Configuration
 
 1. *Clone the repository*
+
 2. Install dependencies:
-    ```Bash
-    `npm install`
-    ```
+
+   ```bash
+   `npm install`
+   ```
+
 3. **Configure Local Development Secrets (`.dev.vars`)**:
    For local development using `wrangler dev`, secrets should be placed in a `.dev.vars` file in the root directory of
    your project. This file should **not** be committed to version control.
 
    Create a file named `.dev.vars` in your project root and add your Google API Key:
+
    ```ini
    GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY_HERE"
    ```
@@ -145,13 +169,15 @@ or
 ### Running Locally
 
 1. Start the development server:
-    ```Bash
-    npm run dev
-    ```
+
+   ```bash
+   npm run dev
+   ```
+
    This will typically start a server on `http://localhost:8787`.
 
 2. Test in your browser or with a tool like curl:
    Open `http://localhost:8787/?videoId=YOUR_YOUTUBE_VIDEO_ID`
 
    For example:
-   `http://localhost:8787/?videoId=Qd_Zcmlf4g4&enhanced=true`
+   `http://localhost:8787/?videoId=Qd_Zcmlf4g4&enhanced=true&useLrcLib=true`
