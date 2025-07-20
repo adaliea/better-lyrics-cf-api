@@ -1,6 +1,6 @@
 import { LyricsResponse } from './LyricUtils';
 
-const LRCLIB_API = 'https://lrclib.net/api/get';
+const LRCLIB_API = 'https://lrclib.net/api/get-cached';
 
 let response: Response;
 

@@ -34,7 +34,7 @@ const cache = caches.default;
 export async function getLyrics(request: Request<unknown, IncomingRequestCfProperties<unknown>>, env: Env): Promise<Response> {
     let cachedResponse = await cache.match(request.url);
     if (cachedResponse) {
-        console.log("Returning cached response");
+        console.log('Returning cached response: ' + request.url);
         return cachedResponse;
     }
 
@@ -200,9 +200,9 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         // cache the request only for a short time
         cacheableResponse.headers.set("Cache-control", "public; max-age=600");
     }
+    cacheableResponse.headers.set('Content-Type', 'application/json');
     awaitLists.add(cache.put(request.url, cacheableResponse));
-
-
+    
     return new Response(json, { status: 200 });
 }
 

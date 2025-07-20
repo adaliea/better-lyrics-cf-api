@@ -221,7 +221,7 @@ export class Musixmatch {
             if (action === 'token.get') {
                 response.headers.set('Cache-control', 'public; max-age=3600');
             } else {
-                response.headers.set('Cache-control', 'public; max-age=86400');
+                response.headers.set('Cache-control', 'public; max-age=604800');
             }
             awaitLists.add(this.cache.put(cacheUrl, response));
         }
