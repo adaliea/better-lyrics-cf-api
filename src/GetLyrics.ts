@@ -49,6 +49,12 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let enhanced = (params.get("enhanced") || "false").toLowerCase() === "true";
     let useLrcLib = (params.get('useLrcLib') || 'false').toLowerCase() === 'true';
 
+    // we'll use this to make sure we control the formatting of multi-artists
+    let artists: string[] = [];
+    if (artist) {
+        artists = artist.split(',').flatMap(a => a.split('&').map(a => a.trim())).filter(a => a.length > 0);
+    }
+
     if (!videoId) {
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
     }
@@ -89,23 +95,22 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 splitSongAndArtist.shift();
 
                 // Check that the original artist is in the metadata list
-                let newArtist = '';
-                if (splitSongAndArtist.length > 3) {
-                    // We have a lot of artists. This probably means writers/etc are also here. Just return the first one in this case.
+                let newArtists = splitSongAndArtist;
+                if (newArtists.length > 3 && newArtists.length > artists.length) {
+                    // We have a lot of artists. This probably means writers/etc are also here.
                     if (snippet.channelTitle && snippet.channelTitle.endsWith('- Topic')) {
-                        newArtist = snippet.channelTitle.substring(0, snippet.channelTitle.length - 7).trim();
+                        // Use the channel title instead
+                        newArtists = [snippet.channelTitle.substring(0, snippet.channelTitle.length - 7).trim()];
+                    } else {
+                        newArtists = [newArtists[0]];
                     }
-                } else {
-                    newArtist = splitSongAndArtist.map(artist => artist.trim()).join(', ');
                 }
 
-                if (!artist || newArtist.includes(artist)) {
-                    artist = newArtist;
+                if (artists.length == 0 || newArtists.includes(artists[0])) {
+                    artists = newArtists;
+                    artist = artists.join(', ');
                 }
             }
-
-            // song = cleanupText(song);
-            // artist = cleanupText(artist);
         }
 
         let contentDetails = videoMeta.items[0].contentDetails;
@@ -164,20 +169,20 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
 
     let artistAlbumSongCombos: { artist: string, song: string, album: string | null }[] = [
         {
-            artist, album, song
+            artist: artists.join(', '), album, song
         }
     ];
 
-    if (artist.split(',').length > 1) {
+    if (artists.length > 1) {
         artistAlbumSongCombos.push({
-            artist: artist.split(',')[0],
+            artist: artists[0],
             album,
             song
         });
     }
     if (album !== null) {
         artistAlbumSongCombos.push({
-            artist: artist.split(',')[0],
+            artist: artists[0],
             album: null,
             song
         });
