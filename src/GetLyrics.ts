@@ -96,7 +96,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                         newArtist = snippet.channelTitle.substring(0, snippet.channelTitle.length - 7).trim();
                     }
                 } else {
-                    newArtist = splitSongAndArtist.map(artist => artist.trim()).join(' & ');
+                    newArtist = splitSongAndArtist.map(artist => artist.trim()).join(', ');
                 }
 
                 if (!artist || newArtist.includes(artist)) {
@@ -156,39 +156,66 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         videoId,
         description,
         debugInfo: null as any,
-        lyrics: null as (String | null | undefined),
         musixmatchWordByWordLyrics: null as any,
         musixmatchSyncedLyrics: null as any,
         lrclibSyncedLyrics: null as any,
         lrclibPlainLyrics: null as any
     };
-    let lrcLibLyricsPromise: Promise<LyricsResponse | null> | null = null;
-    if (useLrcLib) {
-        lrcLibLyricsPromise = getLyricLibLyrics(artist, song, album, duration);
-    }
 
-    try {
-        await tokenPromise;
-        let musixmatchLyrics = await mx.getLrc(artist, song, album, enhanced, lrcLibLyricsPromise);
-        if (musixmatchLyrics) {
-            if (musixmatchLyrics.richSynced) {
-                response.lyrics = musixmatchLyrics.richSynced;
-            } else {
-                response.lyrics = musixmatchLyrics.synced;
-            }
-            response.musixmatchWordByWordLyrics = musixmatchLyrics.richSynced;
-            response.musixmatchSyncedLyrics = musixmatchLyrics.synced;
-            response.debugInfo = musixmatchLyrics.debugInfo;
+    let artistAlbumSongCombos: { artist: string, song: string, album: string | null }[] = [
+        {
+            artist, album, song
         }
-    } catch (e) {
-        console.error(e);
+    ];
+
+    if (artist.split(',').length > 1) {
+        artistAlbumSongCombos.push({
+            artist: artist.split(',')[0],
+            album,
+            song
+        });
+    }
+    if (album !== null) {
+        artistAlbumSongCombos.push({
+            artist: artist.split(',')[0],
+            album: null,
+            song
+        });
     }
 
-    if (useLrcLib) {
-        const lrcLibLyrics = await lrcLibLyricsPromise;
-        response.lrclibSyncedLyrics = lrcLibLyrics?.synced;
-        response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
+    for (let combo of artistAlbumSongCombos) {
+        let lrcLibLyricsPromise: Promise<LyricsResponse | null> | null = null;
+        if (useLrcLib) {
+            lrcLibLyricsPromise = getLyricLibLyrics(combo.artist, combo.song, combo.album, duration);
+        }
+
+        try {
+            await tokenPromise;
+            let musixmatchLyrics = await mx.getLrc(combo.artist, combo.song, combo.album, enhanced, lrcLibLyricsPromise);
+            if (musixmatchLyrics) {
+                response.musixmatchWordByWordLyrics = musixmatchLyrics.richSynced;
+                response.musixmatchSyncedLyrics = musixmatchLyrics.synced;
+                response.debugInfo = musixmatchLyrics.debugInfo;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (useLrcLib) {
+            const lrcLibLyrics = await lrcLibLyricsPromise;
+            response.lrclibSyncedLyrics = lrcLibLyrics?.synced;
+            response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
+        }
+
+        if (response.musixmatchWordByWordLyrics !== null || response.lrclibSyncedLyrics !== null
+            || response.musixmatchSyncedLyrics !== null || response.lrclibPlainLyrics !== null) {
+            response.song = combo.song;
+            response.artist = combo.artist;
+            response.album = combo.album;
+            break;
+        }
     }
+
 
 
     let json = JSON.stringify(response);
@@ -202,7 +229,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     }
     cacheableResponse.headers.set('Content-Type', 'application/json');
     awaitLists.add(cache.put(request.url, cacheableResponse));
-    
+
     return new Response(json, { status: 200 });
 }
 
