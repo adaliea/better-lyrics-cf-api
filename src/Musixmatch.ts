@@ -152,14 +152,15 @@ export class Musixmatch {
         let cachedResponse = await this.cache.match(cacheUrl);
         if (cachedResponse) {
             if (noCache) {
-                console.log('deleting cache for: ' + cacheUrl);
+                console.log({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: true } });
                 awaitLists.add(this.cache.delete(cacheUrl));
             } else {
-                console.log('cache hit for: ' + cacheUrl);
+                console.log({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: false } });
+
                 return cachedResponse;
             }
         } else {
-            console.log("cache miss for: " + cacheUrl)
+            console.log({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl, delete: false } });
         }
 
         const t = Date.now().toString();
@@ -239,7 +240,7 @@ export class Musixmatch {
         }
         const data = await response.json() as MusixmatchResponse;
 
-        console.log({ 'token status: ': data.message.header.status_code });
+        console.log({ 'tokenStatus': data.message.header.status_code });
         if (data.message.header.status_code === 401) {
             throw Error("Failed to get token");
         }
@@ -270,7 +271,7 @@ export class Musixmatch {
         }
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
-        console.log({ 'response data': JSON.stringify(data) });
+        console.log({ 'responseData': JSON.stringify(data) });
         let mean, variance;
 
         if (!response.ok || data.message.header.status_code !== 200) {
@@ -446,7 +447,6 @@ export class Musixmatch {
         const response = await this._get('matcher.track.get', query);
 
         let data = await response.json() as MusixmatchResponse;
-        // console.log(data, data.message.header.status_code);
         if (data.message.header.status_code === 401) {
             this.cookies = [];
             await this.getToken();
@@ -455,7 +455,7 @@ export class Musixmatch {
             data = await response.json() as MusixmatchResponse;
         }
         if (data.message.header.status_code !== 200) {
-            console.error('didn\'t get 200 for message', data.message.header.status_code);
+            console.error({ 'invalidStatusCode': data.message.header.status_code, data: data });
             return null;
         }
 
