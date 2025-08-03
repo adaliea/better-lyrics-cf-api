@@ -196,6 +196,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     }
 
     await tokenPromise;
+    let foundStats = [];
     for (let index in artistAlbumSongCombos) {
         let combo = artistAlbumSongCombos[index];
         let lrcLibLyricsPromise: Promise<LyricsResponse | null> | null = null;
@@ -220,15 +221,14 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
             response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
         }
 
-        console.log({
-            'comboUsed': index,
-            'hasWordByWord': response.musixmatchWordByWordLyrics,
-            'hasLrcLibSynced': response.lrclibSyncedLyrics,
-            'hasMusixmatchSynced': response.musixmatchSyncedLyrics,
-            'hasLrcLibPlain': response.lrclibPlainLyrics
+        foundStats.push({
+            'hasWordByWord': isTruthy(response.musixmatchWordByWordLyrics),
+            'hasLrcLibSynced': isTruthy(response.lrclibSyncedLyrics),
+            'hasMusixmatchSynced': isTruthy(response.musixmatchSyncedLyrics),
+            'hasLrcLibPlain': isTruthy(response.lrclibPlainLyrics)
         });
 
-        if (response.musixmatchWordByWordLyrics || response.lrclibSyncedLyrics || response.musixmatchSyncedLyrics) {
+        if (isTruthy(response.musixmatchWordByWordLyrics) || isTruthy(response.lrclibSyncedLyrics) || isTruthy(response.musixmatchSyncedLyrics)) {
             response.song = combo.song;
             response.artist = combo.artist;
             response.album = combo.album;
@@ -237,10 +237,11 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     }
 
     console.log({
-        foundSyncedLyrics: response.musixmatchWordByWordLyrics || response.lrclibSyncedLyrics || response.musixmatchSyncedLyrics,
-        foundPlainLyrics: response.lrclibPlainLyrics,
-        foundRichSyncedLyrics: response.musixmatchSyncedLyrics,
-        foundLyrics: response.musixmatchWordByWordLyrics || response.lrclibSyncedLyrics || response.musixmatchSyncedLyrics || response.lrclibPlainLyrics,
+        foundStats: foundStats,
+        foundSyncedLyrics: isTruthy(response.musixmatchWordByWordLyrics) || isTruthy(response.lrclibSyncedLyrics) || isTruthy(response.musixmatchSyncedLyrics),
+        foundPlainLyrics: isTruthy(response.lrclibPlainLyrics),
+        foundRichSyncedLyrics: isTruthy(response.musixmatchSyncedLyrics),
+        foundLyrics: isTruthy(response.musixmatchWordByWordLyrics) || isTruthy(response.lrclibSyncedLyrics) || isTruthy(response.musixmatchSyncedLyrics) || isTruthy(response.lrclibPlainLyrics),
         response: response
     });
 
@@ -296,5 +297,9 @@ function cleanupText(text: string | null | undefined): string | null | undefined
 
 
     return result;
+}
+
+function isTruthy(value: string | null | undefined): boolean {
+    return !(value === null || value === undefined);
 }
 
