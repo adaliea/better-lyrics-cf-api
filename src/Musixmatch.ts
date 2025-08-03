@@ -182,7 +182,7 @@ export class Musixmatch {
                 }).join(";");
             }
 
-            console.log('cookie', headers['Cookie']);
+            // console.log('cookie', headers['Cookie']);
 
             response = await fetch(url, {
                 headers,
@@ -239,12 +239,12 @@ export class Musixmatch {
         }
         const data = await response.json() as MusixmatchResponse;
 
-        console.log('token status: ' + data.message.header.status_code);
+        console.log({ 'token status: ': data.message.header.status_code });
         if (data.message.header.status_code === 401) {
             throw Error("Failed to get token");
         }
 
-        console.log('token: ' + data.message.body.user_token);
+        // console.log('token: ' + data.message.body.user_token);
 
         this.token = data.message.body.user_token;
     }
@@ -270,7 +270,7 @@ export class Musixmatch {
         }
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
-        console.log('response data' + JSON.stringify(data));
+        console.log({ 'response data': JSON.stringify(data) });
         let mean, variance;
 
         if (!response.ok || data.message.header.status_code !== 200) {
@@ -446,7 +446,7 @@ export class Musixmatch {
         const response = await this._get('matcher.track.get', query);
 
         let data = await response.json() as MusixmatchResponse;
-        console.log(data, data.message.header.status_code);
+        // console.log(data, data.message.header.status_code);
         if (data.message.header.status_code === 401) {
             this.cookies = [];
             await this.getToken();
@@ -463,7 +463,11 @@ export class Musixmatch {
         const hasRichLyrics = data.message.body.track.has_richsync;
         const hasSubtitles = data.message.body.track.has_subtitles;
         const hasLyrics = data.message.body.track.has_lyrics;
-        console.log('hasRichLyrics', hasRichLyrics, "hasSubtitles", hasSubtitles, "hasLyrics", hasLyrics);
+        console.log({
+            'musixMatchHasRichLyrics': hasRichLyrics,
+            'musixMatchHasSubtitles': hasSubtitles,
+            'musixMatchHasLyrics': hasLyrics
+        });
         if (hasRichLyrics && enhanced) {
             return this.getLrcWordByWord(trackId, lrcLyrics);
         } else if (hasSubtitles) {

@@ -34,8 +34,10 @@ const cache = caches.default;
 export async function getLyrics(request: Request<unknown, IncomingRequestCfProperties<unknown>>, env: Env): Promise<Response> {
     let cachedResponse = await cache.match(request.url);
     if (cachedResponse) {
-        console.log('Returning cached response: ' + request.url);
+        console.log({ usingCachedLyrics: true });
         return cachedResponse;
+    } else {
+        console.log({ usingCachedLyrics: false });
     }
 
     let params = new URL(request.url).searchParams;
@@ -52,8 +54,13 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     // we'll use this to make sure we control the formatting of multi-artists
     let artists: string[] = [];
     if (artist) {
-        artists = artist.split(',').flatMap(a => a.split('&').map(a => a.trim())).filter(a => a.length > 0);
+        artists = artist.split(',')
+            .flatMap(a => a.split('&'))
+            // .flatMap(a => a.split('and'))
+            .map(a => a.trim()).filter(a => a.length > 0);
     }
+
+    console.log({ 'numArtists': artists.length, 'artists': artists });
 
     if (!videoId) {
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
@@ -188,14 +195,15 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         });
     }
 
-    for (let combo of artistAlbumSongCombos) {
+    await tokenPromise;
+    for (let index in artistAlbumSongCombos) {
+        let combo = artistAlbumSongCombos[index];
         let lrcLibLyricsPromise: Promise<LyricsResponse | null> | null = null;
         if (useLrcLib) {
             lrcLibLyricsPromise = getLyricLibLyrics(combo.artist, combo.song, combo.album, duration);
         }
 
         try {
-            await tokenPromise;
             let musixmatchLyrics = await mx.getLrc(combo.artist, combo.song, combo.album, enhanced, lrcLibLyricsPromise);
             if (musixmatchLyrics) {
                 response.musixmatchWordByWordLyrics = musixmatchLyrics.richSynced;
@@ -212,14 +220,29 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
             response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
         }
 
-        if (response.musixmatchWordByWordLyrics !== null || response.lrclibSyncedLyrics !== null
-            || response.musixmatchSyncedLyrics !== null || response.lrclibPlainLyrics !== null) {
+        console.log({
+            'comboUsed': index,
+            'hasWordByWord': response.musixmatchWordByWordLyrics,
+            'hasLrcLibSynced': response.lrclibSyncedLyrics,
+            'hasMusixmatchSynced': response.musixmatchSyncedLyrics,
+            'hasLrcLibPlain': response.lrclibPlainLyrics
+        });
+
+        if (response.musixmatchWordByWordLyrics || response.lrclibSyncedLyrics || response.musixmatchSyncedLyrics) {
             response.song = combo.song;
             response.artist = combo.artist;
             response.album = combo.album;
             break;
         }
     }
+
+    console.log({
+        foundSyncedLyrics: response.musixmatchWordByWordLyrics || response.lrclibSyncedLyrics || response.musixmatchSyncedLyrics,
+        foundPlainLyrics: response.lrclibPlainLyrics,
+        foundRichSyncedLyrics: response.musixmatchSyncedLyrics,
+        foundLyrics: response.musixmatchWordByWordLyrics || response.lrclibSyncedLyrics || response.musixmatchSyncedLyrics || response.lrclibPlainLyrics,
+        response: response
+    });
 
 
 
