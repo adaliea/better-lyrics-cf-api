@@ -135,33 +135,34 @@ export class Musixmatch {
     private token: string | null = null;
     private cookies: { key: string, cookie: string }[] = [];
     private readonly ROOT_URL = 'https://apic-desktop.musixmatch.com/ws/1.1/';
+    private hasAttemptedTokenRetry = false;
+
 
     private cache = caches.default;
 
-    private async _get(action: string, query: [string, string][], noCache = false): Promise<Response> {
+    private async _get(action: string, query: [string, string][], noCache: boolean = false): Promise<Response> {
         query.push(['app_id', 'web-desktop-app-v1.0']);
-        if (this.token) {
+        if (this.token && action !== 'token.get') {
             query.push(['usertoken', this.token]);
         }
-
 
         let url = new URL(this.ROOT_URL + action);
         query.forEach(([key, value]) => url.searchParams.set(key, value));
 
         let cacheUrl = url.toString();
-        let cachedResponse = await this.cache.match(cacheUrl);
-        if (cachedResponse) {
-            if (noCache) {
-                console.log({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: true } });
-                awaitLists.add(this.cache.delete(cacheUrl));
-            } else {
-                console.log({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: false } });
-
+        if (!noCache) {
+            let cachedResponse = await this.cache.match(cacheUrl);
+            if (cachedResponse) {
+                console.log({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: noCache } });
                 return cachedResponse;
+            } else {
+                console.log({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl, delete: noCache } });
             }
         } else {
-            console.log({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl, delete: false } });
+            console.log({ 'musixMatchCache': { cacheUrl: cacheUrl, delete: noCache } });
+            awaitLists.add(this.cache.delete(cacheUrl));
         }
+
 
         const t = Date.now().toString();
         url.searchParams.set("t", t)
@@ -170,7 +171,7 @@ export class Musixmatch {
 
         do {
             const headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
                 'Accept': 'application/json',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Origin': 'https://www.musixmatch.com',
@@ -230,11 +231,11 @@ export class Musixmatch {
         return new Response(teeBody[0], response);
     }
 
-    async getToken(): Promise<void> {
+    async getToken(bypassCache = false): Promise<void> {
         let response;
-        if (this.token) {
+        if (bypassCache) {
             this.token = null;
-            response = await this._get('token.get', [['user_language', 'en']], false);
+            response = await this._get('token.get', [['user_language', 'en']], true);
         } else {
             response = await this._get('token.get', [['user_language', 'en']]);
         }
@@ -431,6 +432,7 @@ export class Musixmatch {
         return { richSynced: null, synced: lrcStr, unsynced: null, debugInfo: null };
     }
 
+
     async getLrc(artist: string, track: string, album: string | null, enhanced: boolean, lrcLyrics: Promise<LyricsResponse | null> | null):
         Promise<LyricsResponse | null> {
 
@@ -447,15 +449,20 @@ export class Musixmatch {
         const response = await this._get('matcher.track.get', query);
 
         let data = await response.json() as MusixmatchResponse;
-        if (data.message.header.status_code === 401) {
+        if (data.message.header.status_code === 401 && !this.hasAttemptedTokenRetry) {
+            this.hasAttemptedTokenRetry = true;
             this.cookies = [];
-            await this.getToken();
+            await this.getToken(true);
             // try again
             const response = await this._get('matcher.track.get', query);
             data = await response.json() as MusixmatchResponse;
         }
         if (data.message.header.status_code !== 200) {
-            console.error({ 'invalidStatusCode': data.message.header.status_code, data: data });
+            console.error({
+                'invalidStatusCode': data.message.header.status_code,
+                body: data.message.body,
+                header: data.message.header
+            });
             return null;
         }
 

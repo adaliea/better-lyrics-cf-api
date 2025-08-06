@@ -212,7 +212,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 response.debugInfo = musixmatchLyrics.debugInfo;
             }
         } catch (e) {
-            console.error(e);
+            console.error({ musixMatchError: e });
         }
 
         if (useLrcLib) {
@@ -237,6 +237,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     }
 
     console.log({
+        combos: artistAlbumSongCombos,
         foundStats: foundStats,
         foundSyncedLyrics: isTruthy(response.musixmatchWordByWordLyrics) || isTruthy(response.lrclibSyncedLyrics) || isTruthy(response.musixmatchSyncedLyrics),
         foundPlainLyrics: isTruthy(response.lrclibPlainLyrics),
