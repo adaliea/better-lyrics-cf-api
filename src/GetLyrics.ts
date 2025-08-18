@@ -195,7 +195,12 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         });
     }
 
-    await tokenPromise;
+    try {
+        await tokenPromise;
+    } catch (e) {
+        console.error({ tokenError: e });
+    }
+
     let foundStats = [];
     for (let index in artistAlbumSongCombos) {
         let combo = artistAlbumSongCombos[index];
