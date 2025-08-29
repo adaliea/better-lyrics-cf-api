@@ -15,6 +15,7 @@ import { getLyrics } from './GetLyrics';
 export let awaitLists = new Set<Promise<any>>();
 export default {
     async fetch(request, env, ctx): Promise<Response> {
+        observabilityData = {};
         if (request.method === "OPTIONS") {
             return new Response(null, {
                 headers: {
@@ -44,17 +45,22 @@ export default {
     },
 } satisfies ExportedHandler<Env>;
 
-let observabilityData = new Map<string, any>();
+let observabilityData: Record<string, any[]> = {};
 
-export function observe(data: any) {
-    observabilityData.forEach((value, key, map) => {
-        if (observabilityData.has(key)) {
-            let count = 1;
-            while (observabilityData.has(key + count)) {
-                count++;
+export function observe(data: Record<string, any>): void {
+    // Iterate over each key in the provided data object.
+    for (const key in data) {
+        // A safer way to check for an object's own properties.
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+            const value = data[key];
+
+            // If we've never seen this key before, initialize its value as an empty array.
+            if (!observabilityData[key]) {
+                observabilityData[key] = [];
             }
-            key = key + count;
+
+            // Push the new value into the array for that key.
+            observabilityData[key].push(value);
         }
-        observabilityData.set(key, value);
-    });
+    }
 }
