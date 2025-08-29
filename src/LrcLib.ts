@@ -1,4 +1,5 @@
 import { LyricsResponse } from './LyricUtils';
+import { observe } from './index';
 
 const LRCLIB_API_CACHED = 'https://lrclib.net/api/get-cached';
 const LRCLIB_API = 'https://lrclib.net/api/get';
@@ -48,7 +49,7 @@ export async function getLyricLibLyrics(artist: string, song: string, album: str
             };
         })
         .catch(err => {
-            console.log(err);
+            observe({ 'lrclibError': err });
             return null;
         });
 }

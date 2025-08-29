@@ -1,5 +1,5 @@
 // Types for our responses and data
-import { awaitLists } from './index';
+import { awaitLists, observe } from './index';
 import { Diff, diffArrays } from 'diff';
 import { LyricsResponse, parseLrc } from './LyricUtils';
 
@@ -153,13 +153,13 @@ export class Musixmatch {
         if (!noCache) {
             let cachedResponse = await this.cache.match(cacheUrl);
             if (cachedResponse) {
-                console.log({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: noCache } });
+                observe({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: noCache } });
                 return cachedResponse;
             } else {
-                console.log({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl, delete: noCache } });
+                observe({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl, delete: noCache } });
             }
         } else {
-            console.log({ 'musixMatchCache': { cacheUrl: cacheUrl, delete: noCache } });
+            observe({ 'musixMatchCache': { cacheUrl: cacheUrl, delete: noCache } });
             awaitLists.add(this.cache.delete(cacheUrl));
         }
 
@@ -241,7 +241,7 @@ export class Musixmatch {
         }
         const data = await response.json() as MusixmatchResponse;
 
-        console.log({ 'tokenStatus': data.message.header.status_code });
+        observe({ 'tokenStatus': data.message.header.status_code });
         if (data.message.header.status_code === 401) {
             throw Error("Failed to get token");
         }
@@ -272,7 +272,7 @@ export class Musixmatch {
         }
         const response = await this._get('track.richsync.get', [['track_id', String(trackId)]]);
         const data = await response.json() as MusixmatchResponse;
-        console.log({ 'responseData': JSON.stringify(data) });
+        observe({ 'responseData': JSON.stringify(data) });
         let mean, variance;
 
         if (!response.ok || data.message.header.status_code !== 200) {
@@ -458,10 +458,12 @@ export class Musixmatch {
             data = await response.json() as MusixmatchResponse;
         }
         if (data.message.header.status_code !== 200) {
-            console.error({
+            observe({
+                musixMatchCookieError: {
                 'invalidStatusCode': data.message.header.status_code,
                 body: data.message.body,
                 header: data.message.header
+                }
             });
             return null;
         }
@@ -470,7 +472,7 @@ export class Musixmatch {
         const hasRichLyrics = data.message.body.track.has_richsync;
         const hasSubtitles = data.message.body.track.has_subtitles;
         const hasLyrics = data.message.body.track.has_lyrics;
-        console.log({
+        observe({
             'musixMatchHasRichLyrics': hasRichLyrics,
             'musixMatchHasSubtitles': hasSubtitles,
             'musixMatchHasLyrics': hasLyrics

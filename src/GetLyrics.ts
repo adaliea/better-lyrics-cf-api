@@ -1,5 +1,5 @@
 import { Musixmatch } from './Musixmatch';
-import { awaitLists } from './index';
+import { awaitLists, observe } from './index';
 import { getLyricLibLyrics, LrcLibResponse } from './LrcLib';
 import { LyricsResponse } from './LyricUtils';
 
@@ -34,10 +34,10 @@ const cache = caches.default;
 export async function getLyrics(request: Request<unknown, IncomingRequestCfProperties<unknown>>, env: Env): Promise<Response> {
     let cachedResponse = await cache.match(request.url);
     if (cachedResponse) {
-        console.log({ usingCachedLyrics: true });
+        observe({ usingCachedLyrics: true });
         return cachedResponse;
     } else {
-        console.log({ usingCachedLyrics: false });
+        observe({ usingCachedLyrics: false });
     }
 
     let params = new URL(request.url).searchParams;
@@ -60,7 +60,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
             .map(a => a.trim()).filter(a => a.length > 0);
     }
 
-    console.log({ 'numArtists': artists.length, 'artists': artists });
+    observe({ 'numArtists': artists.length, 'artists': artists });
 
     if (!videoId) {
         return new Response(JSON.stringify("Invalid Video Id"), { status: 400 });
@@ -198,7 +198,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     try {
         await tokenPromise;
     } catch (e) {
-        console.error({ tokenError: e });
+        observe({ tokenError: e });
     }
 
     let foundStats = [];
@@ -208,6 +208,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         if (useLrcLib) {
             lrcLibLyricsPromise = getLyricLibLyrics(combo.artist, combo.song, combo.album, duration);
         }
+        let mxmError = null;
 
         try {
             let musixmatchLyrics = await mx.getLrc(combo.artist, combo.song, combo.album, enhanced, lrcLibLyricsPromise);
@@ -217,7 +218,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
                 response.debugInfo = musixmatchLyrics.debugInfo;
             }
         } catch (e) {
-            console.error({ musixMatchError: e });
+            mxmError = e;
         }
 
         if (useLrcLib) {
@@ -230,7 +231,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
             'hasWordByWord': isTruthy(response.musixmatchWordByWordLyrics),
             'hasLrcLibSynced': isTruthy(response.lrclibSyncedLyrics),
             'hasMusixmatchSynced': isTruthy(response.musixmatchSyncedLyrics),
-            'hasLrcLibPlain': isTruthy(response.lrclibPlainLyrics)
+            'hasLrcLibPlain': isTruthy(response.lrclibPlainLyrics),
+            'musixMatchError': mxmError
         });
 
         if (isTruthy(response.musixmatchWordByWordLyrics) || isTruthy(response.lrclibSyncedLyrics) || isTruthy(response.musixmatchSyncedLyrics)) {
@@ -241,7 +243,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         }
     }
 
-    console.log({
+    observe({
         combos: artistAlbumSongCombos,
         foundStats: foundStats,
         foundSyncedLyrics: isTruthy(response.musixmatchWordByWordLyrics) || isTruthy(response.lrclibSyncedLyrics) || isTruthy(response.musixmatchSyncedLyrics),

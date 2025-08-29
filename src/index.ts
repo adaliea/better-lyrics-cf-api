@@ -33,11 +33,28 @@ export default {
             for (const awaitList of awaitLists) {
                 ctx.waitUntil(awaitList);
             }
+            console.log(observabilityData);
             return response;
         } catch (e) {
             console.error(e);
+            console.log(observabilityData);
         }
 
         return new Response(null, { status: 400 });
     },
 } satisfies ExportedHandler<Env>;
+
+let observabilityData = new Map<string, any>();
+
+export function observe(data: any) {
+    observabilityData.forEach((value, key, map) => {
+        if (observabilityData.has(key)) {
+            let count = 1;
+            while (observabilityData.has(key + count)) {
+                count++;
+            }
+            key = key + count;
+        }
+        observabilityData.set(key, value);
+    });
+}
