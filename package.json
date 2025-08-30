@@ -15,6 +15,7 @@
         "wrangler": "^4.4.0"
     },
     "dependencies": {
+        "@cloudflare/vitest-pool-workers": "^0.8.68",
         "diff": "^7.0.0"
     }
 }

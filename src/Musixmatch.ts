@@ -291,18 +291,9 @@ export class Musixmatch {
                 const time = this.formatTime(item.ts + lyric.o);
                 lrcStr += `<${time}> ${lyric.c} `;
 
-                for (let i = 0; i < lyric.c.length; i++) {
-                    let char = lyric.c[i];
-                    if (i === 0) {
-                        richSyncTokenArray.push({
-                            word: char, wordTime: item.ts + lyric.o
-                        });
-                    } else {
-                        richSyncTokenArray.push({
-                            word: char, wordTime: -1
-                        });
-                    }
-                }
+                richSyncTokenArray.push({
+                    word: lyric.c, wordTime: item.ts + lyric.o
+                });
             }
             richSyncTokenArray.push({
                 word: '\n', wordTime: -1
@@ -322,15 +313,21 @@ export class Musixmatch {
             let parsedLrc = parseLrc(basicLrc.synced);
             let parsedLrcTokenArray: MatchingTimedWord[] = [];
             parsedLrc.forEach(({startTimeMs, words}, index) => {
-                for (let i = 0; i < words.length; i++) {
-                    let char = words[i];
+                let wordsSplit = words.split(' ');
+                for (let i = 0; i < wordsSplit.length; i++) {
                     if (i === 0) {
                         parsedLrcTokenArray.push({
-                            word: char, wordTime: startTimeMs / 1000.0
+                            word: wordsSplit[i], wordTime: startTimeMs / 1000
                         });
                     } else {
                         parsedLrcTokenArray.push({
-                            word: char, wordTime: -1
+                            word: wordsSplit[i], wordTime: -1
+                        });
+                    }
+
+                    if (i !== wordsSplit.length - 1) {
+                        parsedLrcTokenArray.push({
+                            word: ' ', wordTime: -1
                         });
                     }
                 }
