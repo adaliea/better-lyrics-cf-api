@@ -338,6 +338,13 @@ export class Musixmatch {
                 }
             });
 
+            if (parsedLrcTokenArray.length > 5000 || richSyncTokenArray.length > 5000) {
+                return {
+                    richSynced: null, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
+                        comment: 'lyrics too long to diff'
+                    }
+                };
+            }
             let diff = diffArrays(parsedLrcTokenArray, richSyncTokenArray, { comparator: (left, right) => left.word.toLowerCase() === right.word.toLowerCase() });
 
             let leftIndex = 0;

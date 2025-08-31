@@ -28,7 +28,6 @@ type videoMetaType = {
     }]
 }
 
-const mx = new Musixmatch();
 const cache = caches.default;
 
 export async function getLyrics(request: Request<unknown, IncomingRequestCfProperties<unknown>>, env: Env): Promise<Response> {
@@ -50,6 +49,9 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let description: string | null = null;
     let enhanced = (params.get("enhanced") || "false").toLowerCase() === "true";
     let useLrcLib = (params.get('useLrcLib') || 'false').toLowerCase() === 'true';
+
+    const mx = new Musixmatch();
+
 
     // we'll use this to make sure we control the formatting of multi-artists
     let artists: string[] = [];
@@ -287,8 +289,10 @@ function cleanupText(text: string | null | undefined): string | null | undefined
 
     let result = text;
     let lastResult = '';
+    let i = 0;
 
-    while (result !== lastResult) {
+    while (result !== lastResult && i < 10) {
+        i++;
         lastResult = result;
         result = result
             .replace(/\[([^\[\]]*)\]/g, (match, content) => {
