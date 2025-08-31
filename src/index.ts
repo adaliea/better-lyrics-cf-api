@@ -16,6 +16,7 @@ export let awaitLists = new Set<Promise<any>>();
 export default {
     async fetch(request, env, ctx): Promise<Response> {
         observabilityData = {};
+        awaitLists = new Set<Promise<any>>();
         if (request.method === "OPTIONS") {
             return new Response(null, {
                 headers: {

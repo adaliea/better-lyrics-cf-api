@@ -5,8 +5,6 @@ const LRCLIB_API_CACHED = 'https://lrclib.net/api/get-cached';
 const LRCLIB_API = 'https://lrclib.net/api/get';
 
 
-let response: Response;
-
 
 export interface LrcLibResponse {
     id: number;
