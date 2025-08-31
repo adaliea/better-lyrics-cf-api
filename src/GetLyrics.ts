@@ -180,20 +180,20 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
         }
     ];
 
-    if (artists.length > 1) {
-        artistAlbumSongCombos.push({
-            artist: artists[0],
-            album,
-            song
-        });
-    }
-    if (album !== null) {
-        artistAlbumSongCombos.push({
-            artist: artists[0],
-            album: null,
-            song
-        });
-    }
+    // if (artists.length > 1) {
+    //     artistAlbumSongCombos.push({
+    //         artist: artists[0],
+    //         album,
+    //         song
+    //     });
+    // }
+    // if (album !== null) {
+    //     artistAlbumSongCombos.push({
+    //         artist: artists[0],
+    //         album: null,
+    //         song
+    //     });
+    // }
 
     try {
         await tokenPromise;

@@ -48,9 +48,7 @@ export default {
 let observabilityData: Record<string, any[]> = {};
 
 export function observe(data: Record<string, any>): void {
-    // Iterate over each key in the provided data object.
     for (const key in data) {
-        // A safer way to check for an object's own properties.
         if (Object.prototype.hasOwnProperty.call(data, key)) {
             const value = data[key];
 

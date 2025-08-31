@@ -47,3 +47,7 @@ mode = "smart"
 # [[services]]
 # binding = "MY_SERVICE"
 # service = "my-service"
+
+
+[limits]
+cpu_ms = 40
