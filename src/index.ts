@@ -31,7 +31,7 @@ export default {
             response = new Response(response.body, response);
             response.headers.set('content-type', 'application/json');
             response.headers.set('Access-Control-Allow-Origin', 'https://music.youtube.com');
-            // response.headers.set("Cache-Control", "max-age=604800, stale-while-revalidate=604800");
+            response.headers.set('Cache-Control', 'max-age=600, stale-while-revalidate=600');
             for (const awaitList of awaitLists) {
                 ctx.waitUntil(awaitList);
             }
