@@ -50,4 +50,4 @@ mode = "smart"
 
 
 [limits]
-cpu_ms = 40
+cpu_ms = 25
