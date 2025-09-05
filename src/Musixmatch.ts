@@ -131,36 +131,33 @@ export interface MatchingTimedWord {
 }
 
 
+// These fields can persist through multiple requests to the API
+let token: string | null = null; // null means we haven't gotten a token yet
+let tokenRetryCount = 0;
+let tokenRetryMax = 3;
+
 export class Musixmatch {
-    private token: string | null = null;
     private cookies: { key: string, cookie: string }[] = [];
     private readonly ROOT_URL = 'https://apic-desktop.musixmatch.com/ws/1.1/';
-    private hasAttemptedTokenRetry = false;
-
 
     private cache = caches.default;
 
-    private async _get(action: string, query: [string, string][], noCache: boolean = false): Promise<Response> {
+    private async _get(action: string, query: [string, string][]): Promise<Response> {
         query.push(['app_id', 'web-desktop-app-v1.0']);
-        if (this.token && action !== 'token.get') {
-            query.push(['usertoken', this.token]);
+        if (token && action !== 'token.get') {
+            query.push(['usertoken', token]);
         }
 
         let url = new URL(this.ROOT_URL + action);
         query.forEach(([key, value]) => url.searchParams.set(key, value));
 
         let cacheUrl = url.toString();
-        if (!noCache) {
-            let cachedResponse = await this.cache.match(cacheUrl);
-            if (cachedResponse) {
-                observe({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl, delete: noCache } });
-                return cachedResponse;
-            } else {
-                observe({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl, delete: noCache } });
-            }
+        let cachedResponse = await this.cache.match(cacheUrl);
+        if (cachedResponse) {
+            observe({ 'musixMatchCache': { found: true, cacheUrl: cacheUrl } });
+            return cachedResponse;
         } else {
-            observe({ 'musixMatchCache': { cacheUrl: cacheUrl, delete: noCache } });
-            awaitLists.add(this.cache.delete(cacheUrl));
+            observe({ 'musixMatchCache': { found: false, cacheUrl: cacheUrl } });
         }
 
 
@@ -171,7 +168,7 @@ export class Musixmatch {
 
         do {
             const headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
                 'Accept': 'application/json',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Origin': 'https://www.musixmatch.com',
@@ -231,24 +228,26 @@ export class Musixmatch {
         return new Response(teeBody[0], response);
     }
 
-    async getToken(bypassCache = false): Promise<void> {
-        let response;
-        if (bypassCache) {
-            this.token = null;
-            response = await this._get('token.get', [['user_language', 'en']], true);
+    async getToken(): Promise<void> {
+        if (token === null && tokenRetryCount < tokenRetryMax) {
+            let response = await this._get('token.get', [['user_language', 'en']]);
+            const data = await response.json() as MusixmatchResponse;
+
+            observe({ 'tokenStatus': data.message.header.status_code, 'tokenRetryCount': tokenRetryCount });
+            tokenRetryCount++;
+            if (data.message.header.status_code === 401) {
+                throw Error('Failed to get token');
+            }
+
+            token = data.message.body.user_token;
         } else {
-            response = await this._get('token.get', [['user_language', 'en']]);
+            if (token === null) {
+                observe({ 'tokenStatus': 'too many retries', 'tokenRetryCount': tokenRetryCount });
+                throw Error('Failed to get token');
+            } else {
+                observe({ 'tokenStatus': 'token already valid', 'tokenRetryCount': tokenRetryCount });
+            }
         }
-        const data = await response.json() as MusixmatchResponse;
-
-        observe({ 'tokenStatus': data.message.header.status_code });
-        if (data.message.header.status_code === 401) {
-            throw Error("Failed to get token");
-        }
-
-        // console.log('token: ' + data.message.body.user_token);
-
-        this.token = data.message.body.user_token;
     }
 
     private formatTime(timeInSeconds: number): string {
@@ -440,6 +439,11 @@ export class Musixmatch {
     async getLrc(artist: string, track: string, album: string | null, enhanced: boolean, lrcLyrics: Promise<LyricsResponse | null> | null):
         Promise<LyricsResponse | null> {
 
+        observe({ 'musixMatchHasValidToken': token !== null });
+        if (token === null) {
+            return null;
+        }
+
         let query: [string, string][] = [
             ['q_track', track],
             ['q_artist', artist],
@@ -453,13 +457,11 @@ export class Musixmatch {
         const response = await this._get('matcher.track.get', query);
 
         let data = await response.json() as MusixmatchResponse;
-        if (data.message.header.status_code === 401 && !this.hasAttemptedTokenRetry) {
-            this.hasAttemptedTokenRetry = true;
-            this.cookies = [];
-            await this.getToken(true);
-            // try again
-            const response = await this._get('matcher.track.get', query);
-            data = await response.json() as MusixmatchResponse;
+        if (data.message.header.status_code === 401) {
+            // The token is not valid
+            // we're not going to retry b/c testing shows this won't work
+            // instead just set it to null so the next request can try again
+            token = null;
         }
         if (data.message.header.status_code !== 200) {
             observe({
