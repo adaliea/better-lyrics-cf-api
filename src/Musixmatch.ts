@@ -2,6 +2,8 @@
 import { awaitLists, observe } from './index';
 import { Diff, diffArrays } from 'diff';
 import { LyricsResponse, parseLrc } from './LyricUtils';
+import { getLyricsFromCache, saveLyricsToCache } from './MusixmatchCache';
+import { env } from 'cloudflare:workers';
 
 
 
@@ -386,22 +388,12 @@ export class Musixmatch {
                     }
                 };
             } else {
-                if (lrcLyrics) {
-                    return {
-                        richSynced: null, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
-                            lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
-                            comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
-                        }
-                    };
-                } else {
-                    return {
-                        richSynced: null, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
-                            lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
-                            comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
-                        }
-                    };
-                }
-
+                return {
+                    richSynced: null, synced: (await musixmatchBasicLyrics)?.synced, unsynced: null, debugInfo: {
+                        lyricMatchingStats: { mean, variance, samples: basicLrcOffset, diff: diffDebug },
+                        comment: 'basic lyrics matched but variance is too high; using basic lyrics instead'
+                    }
+                };
             }
         }
 
@@ -436,9 +428,31 @@ export class Musixmatch {
     }
 
 
-    async getLrc(artist: string, track: string, album: string | null, enhanced: boolean, lrcLyrics: Promise<LyricsResponse | null> | null):
+    async getLrc(videoId: string, artist: string, track: string, album: string | null, lrcLyrics: Promise<LyricsResponse | null> | null, tokenPromise: Promise<void>):
         Promise<LyricsResponse | null> {
+        // First try to get lyrics from the cache:
+        let cachedLyrics = await getLyricsFromCache("youtube_music", videoId)
+        if (cachedLyrics !== null) {
+            let richSynced: string | null = null;
+            let normalSynced: string | null = null;
 
+            for (const lyric of cachedLyrics) {
+                if (lyric.format == "rich_sync") {
+                    richSynced = lyric.content;
+                } else if (lyric.format == "normal_sync") {
+                    normalSynced = lyric.content;
+                }
+            }
+
+            return {
+                richSynced: richSynced, synced: normalSynced, unsynced: null, debugInfo: {
+                    lyricMatchingStats: null,
+                    comment: 'musixmatch cache'
+                }
+            };
+        }
+
+        await tokenPromise;
         observe({ 'musixMatchHasValidToken': token !== null });
         if (token === null) {
             return null;
@@ -483,12 +497,41 @@ export class Musixmatch {
             'musixMatchHasSubtitles': hasSubtitles,
             'musixMatchHasLyrics': hasLyrics
         });
-        if (hasRichLyrics && enhanced) {
-            return this.getLrcWordByWord(trackId, lrcLyrics);
+        let result = null;
+        if (hasRichLyrics) {
+            result = await this.getLrcWordByWord(trackId, lrcLyrics);
         } else if (hasSubtitles) {
-            return this.getLrcById(trackId);
+            result = await this.getLrcById(trackId);
         }
-        return null;
+
+        if (result) {
+            if (result.richSynced) {
+                awaitLists.add(
+                    saveLyricsToCache({
+                        musixmatch_track_id: Number(trackId),
+                        source_platform: "youtube_music",
+                        source_track_id: videoId,
+                        lyric_format: "rich_sync",
+                        lyric_content: result.richSynced,
+                    })
+                );
+            }
+            if (result.synced) {
+                awaitLists.add(
+                    saveLyricsToCache({
+                        musixmatch_track_id: Number(trackId),
+                        source_platform: "youtube_music",
+                        source_track_id: videoId,
+                        lyric_format: 'normal_sync',
+                        lyric_content: result.synced,
+                    })
+                );
+            }
+        }
+
+
+
+        return result;
     }
 }
 

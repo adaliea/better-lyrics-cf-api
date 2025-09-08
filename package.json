@@ -9,13 +9,14 @@
         "cf-typegen": "wrangler types"
     },
     "devDependencies": {
-        "@cloudflare/workers-types": "^4.20250109.0",
         "@types/diff": "^7.0.1",
         "typescript": "^5.5.2",
         "wrangler": "^4.4.0"
     },
     "dependencies": {
         "@cloudflare/vitest-pool-workers": "^0.8.68",
-        "diff": "^7.0.0"
+        "@types/pako": "^2.0.4",
+        "diff": "^7.0.0",
+        "pako": "^2.1.0"
     }
 }

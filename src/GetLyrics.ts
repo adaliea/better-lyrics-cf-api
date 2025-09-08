@@ -47,9 +47,6 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let parsedSongAndArtist: string | null = null;
     let videoId = params.get("videoId");
     let description: string | null = null;
-    let enhanced = (params.get("enhanced") || "false").toLowerCase() === "true";
-    let useLrcLib = (params.get('useLrcLib') || 'false').toLowerCase() === 'true';
-
     const mx = new Musixmatch();
 
 
@@ -197,23 +194,15 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     //     });
     // }
 
-    try {
-        await tokenPromise;
-    } catch (e) {
-        observe({ tokenError: e });
-    }
-
     let foundStats = [];
     for (let index in artistAlbumSongCombos) {
         let combo = artistAlbumSongCombos[index];
-        let lrcLibLyricsPromise: Promise<LyricsResponse | null> | null = null;
-        if (useLrcLib) {
-            lrcLibLyricsPromise = getLyricLibLyrics(combo.artist, combo.song, combo.album, duration);
-        }
+        let lrcLibLyricsPromise = getLyricLibLyrics(combo.artist, combo.song, combo.album, duration);
+
         let mxmError = null;
 
         try {
-            let musixmatchLyrics = await mx.getLrc(combo.artist, combo.song, combo.album, enhanced, lrcLibLyricsPromise);
+            let musixmatchLyrics = await mx.getLrc(videoId, combo.artist, combo.song, combo.album, lrcLibLyricsPromise, tokenPromise);
             if (musixmatchLyrics) {
                 response.musixmatchWordByWordLyrics = musixmatchLyrics.richSynced;
                 response.musixmatchSyncedLyrics = musixmatchLyrics.synced;
@@ -223,11 +212,10 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
             mxmError = e;
         }
 
-        if (useLrcLib) {
-            const lrcLibLyrics = await lrcLibLyricsPromise;
-            response.lrclibSyncedLyrics = lrcLibLyrics?.synced;
-            response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
-        }
+        const lrcLibLyrics = await lrcLibLyricsPromise;
+        response.lrclibSyncedLyrics = lrcLibLyrics?.synced;
+        response.lrclibPlainLyrics = lrcLibLyrics?.unsynced;
+
 
         foundStats.push({
             'hasWordByWord': isTruthy(response.musixmatchWordByWordLyrics),
