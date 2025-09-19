@@ -35,7 +35,6 @@ type SourcePlatform = 'youtube_music' | 'spotify' | 'apple_music';
  * Fetches and uncompresses lyrics from the D1/R2 cache.
  * @param source_platform - The platform name (e.g., 'youtube_music').
  * @param source_track_id - The unique track ID from the source platform.
- * @param env - The Cloudflare Worker environment object.
  * @returns An array of lyric objects or null if not found.
  */
 export async function getLyricsFromCache(
