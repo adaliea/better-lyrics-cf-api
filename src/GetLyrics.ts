@@ -46,6 +46,8 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
     let duration = params.get('duration');
     let parsedSongAndArtist: string | null = null;
     let videoId = params.get("videoId");
+    let alwaysFetchMetadata = params.get('alwaysFetchMetadata')?.toLowerCase() === 'true';
+
     let description: string | null = null;
     const mx = new Musixmatch();
 
@@ -70,7 +72,7 @@ export async function getLyrics(request: Request<unknown, IncomingRequestCfPrope
 
     let tokenPromise = mx.getToken();
 
-    if (!song || song.trim().length === 0 || artists.length === 0 || !album || album.length === 0) {
+    if (alwaysFetchMetadata || !song || song.trim().length === 0 || artists.length === 0 || !album || album.length === 0) {
         let snippetUrl = new URL(youtubeSnippetAPI);
         snippetUrl.searchParams.set('id', videoId);
         snippetUrl.searchParams.set('key', env.GOOGLE_API_KEY);
