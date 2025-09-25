@@ -31,8 +31,7 @@ type LyricType = 'rich_sync' | 'normal_sync';
 
 type SourcePlatform = 'youtube_music' | 'spotify' | 'apple_music';
 
-const session = env.DB.withSession()
-
+let session: D1DatabaseSession;
 /**
  * Fetches and uncompresses lyrics from the D1/R2 cache.
  * @param source_platform - The platform name (e.g., 'youtube_music').
@@ -43,6 +42,10 @@ export async function getLyricsFromCache(
     source_platform: SourcePlatform,
     source_track_id: string,
 ): Promise<Lyric[] | null> {
+    if (!session) {
+        session = env.DB.withSession()
+    }
+
     // 1. Execute a single JOIN query to get all data at once.
     const stmt = session.prepare(`
     SELECT
@@ -115,6 +118,10 @@ export async function getLyricsFromCache(
  */
 export async function saveLyricsToCache(data: SaveLyricsData): Promise<boolean> {
     try {
+        if (!session) {
+            session = env.DB.withSession()
+        }
+
         const compressedContent: Uint8Array = pako.deflate(data.lyric_content);
 
         // Generate a unique key for the R2 object.

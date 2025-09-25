@@ -2,6 +2,7 @@
 name = "better-lyrics-cf-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-09"
+preview_urls = true
 
 # Workers Logs
 # Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
