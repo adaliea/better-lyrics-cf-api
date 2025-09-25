@@ -31,6 +31,8 @@ type LyricType = 'rich_sync' | 'normal_sync';
 
 type SourcePlatform = 'youtube_music' | 'spotify' | 'apple_music';
 
+const session = env.DB.withSession()
+
 /**
  * Fetches and uncompresses lyrics from the D1/R2 cache.
  * @param source_platform - The platform name (e.g., 'youtube_music').
@@ -42,7 +44,7 @@ export async function getLyricsFromCache(
     source_track_id: string,
 ): Promise<Lyric[] | null> {
     // 1. Execute a single JOIN query to get all data at once.
-    const stmt = env.DB.prepare(`
+    const stmt = session.prepare(`
     SELECT
       t.id as track_id,
       t.last_accessed_at,
@@ -71,7 +73,7 @@ export async function getLyricsFromCache(
     let updateTimestampPromise: Promise<any> = Promise.resolve();
     if (now - lastAccessedAt > 86400) { // 86400 seconds = 1 day
         observe({'musixmatchCacheTimestampUpdate': {updatedAt: now, internalTrackId}});
-        updateTimestampPromise = env.DB.prepare(
+        updateTimestampPromise = session.prepare(
             "UPDATE tracks SET last_accessed_at = ?1 WHERE id = ?2"
         ).bind(now, internalTrackId).run();
         awaitLists.add(updateTimestampPromise);
@@ -123,12 +125,12 @@ export async function saveLyricsToCache(data: SaveLyricsData): Promise<boolean> 
         observe({musixmatchCacheSavedCompressedObject: {r2ObjectKey}})
 
         // Get the internal track ID, creating the track record if it doesn't exist.
-        const insertTrackStmt = env.DB.prepare(
+        const insertTrackStmt = session.prepare(
             "INSERT INTO tracks (musixmatch_track_id, last_accessed_at) VALUES (?1, ?2) ON CONFLICT(musixmatch_track_id) DO NOTHING"
         ).bind(data.musixmatch_track_id, Math.floor(Date.now() / 1000));
         await insertTrackStmt.run();
 
-        const getTrackStmt = env.DB.prepare(
+        const getTrackStmt = session.prepare(
             "SELECT id FROM tracks WHERE musixmatch_track_id = ?1"
         ).bind(data.musixmatch_track_id);
         const track = await getTrackStmt.first<D1Track>();
@@ -140,16 +142,16 @@ export async function saveLyricsToCache(data: SaveLyricsData): Promise<boolean> 
 
         // Prepare and execute the final inserts for lyrics and mappings in a batch.
         const finalStmts = [
-            env.DB.prepare(
+            session.prepare(
                 "INSERT INTO lyrics (track_id, format, r2_object_key) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING"
             ).bind(internalTrackId, data.lyric_format, r2ObjectKey),
 
-            env.DB.prepare(
+            session.prepare(
                 "INSERT INTO track_mappings (source_platform, source_track_id, track_id) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING"
             ).bind(data.source_platform, data.source_track_id, internalTrackId)
         ];
 
-        await env.DB.batch(finalStmts);
+        await session.batch(finalStmts);
 
         observe({musixmatchCacheSave: {success: true, data}})
         return true;
