@@ -22,6 +22,7 @@ export default {
                 headers: {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "https://music.youtube.com",
+                    'Access-Control-Allow-Credentials': 'true'
                 },
             });
         }
@@ -32,6 +33,7 @@ export default {
             response.headers.set('content-type', 'application/json');
             response.headers.set('Access-Control-Allow-Origin', 'https://music.youtube.com');
             response.headers.set('Cache-Control', 'max-age=600, stale-while-revalidate=600');
+            response.headers.set('Access-Control-Allow-Credentials', 'true');
             for (const awaitList of awaitLists) {
                 ctx.waitUntil(awaitList);
             }

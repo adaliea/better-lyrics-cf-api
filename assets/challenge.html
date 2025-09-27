@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="background-color:transparent; padding: 0; margin: 0; width: 0; height: 0;">
+
+
+<script>
+    function jsdOnload() {
+        window.cloudflare.jsd.executeOnce(
+            {
+                callback: function(result) {
+                    console.log('CF Challenge', result);
+                }
+            }
+        );
+    }
+</script>
+<script src="/cdn-cgi/challenge-platform/scripts/jsd/api.js?onload=jsdOnload" async></script>
+
+</body>
+</html>

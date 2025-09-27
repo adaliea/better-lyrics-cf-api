@@ -54,3 +54,8 @@ preview_bucket_name = "lyrics-bucket-preview"
 
 [limits]
 cpu_ms = 25
+
+
+[assets]
+directory = "./assets"
+binding = "ASSETS"
