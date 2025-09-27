@@ -27,7 +27,7 @@ export default {
             return new Response(null, {
                 headers: {
                     "Content-Type": "application/json",
-                    'Access-Control-Allow-Origin': '*', // More permissive for OPTIONS
+                    'Access-Control-Allow-Origin': 'https://music.youtube.com',
                     'Access-Control-Allow-Credentials': 'true',
                     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                     'Access-Control-Allow-Headers': 'Authorization, Content-Type'
@@ -53,7 +53,9 @@ export default {
 
 async function handleTurnstileVerification(request: Request, env: Env): Promise<Response> {
     const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://music.youtube.com',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
         'Content-Type': 'application/json'
     };
     try {
@@ -87,6 +89,7 @@ async function handleLyricsRequest(request: Request, env: Env, ctx: ExecutionCon
     const corsHeaders = {
         'Access-Control-Allow-Origin': 'https://music.youtube.com',
         'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
         'Content-Type': 'application/json'
     };
 
