@@ -1,0 +1,126 @@
+openapi: 3.0.0
+info:
+    title: Better Lyrics API
+    version: 1.0.0
+    description: |-
+        This API provides lyrics for songs from various sources.
+        It can be queried using a YouTube Video ID, or a combination of song, artist, and album.
+servers:
+    -   url: https://lyrics.api.dacubeking.com/
+paths:
+    /:
+        get:
+            summary: Get Lyrics
+            description: Retrieves lyrics for a song.
+            parameters:
+                -   name: artist
+                    in: query
+                    description: The artist of the song. Can be a comma-separated list.
+                    schema:
+                        type: string
+                -   name: song
+                    in: query
+                    description: The name of the song.
+                    schema:
+                        type: string
+                -   name: album
+                    in: query
+                    description: The album of the song.
+                    schema:
+                        type: string
+                -   name: duration
+                    in: query
+                    description: The duration of the song in seconds.
+                    schema:
+                        type: string
+                -   name: videoId
+                    in: query
+                    required: true
+                    description: The YouTube video ID.
+                    schema:
+                        type: string
+                -   name: alwaysFetchMetadata
+                    in: query
+                    description: If true, it will always fetch metadata from the YouTube API.
+                    schema:
+                        type: boolean
+                -   name: useLrcLib
+                    in: query
+                    description: unused
+                    schema:
+                        type: boolean
+                -   name: enhanced
+                    in: query
+                    description: unused
+                    schema:
+                        type: boolean
+
+
+            responses:
+                '200':
+                    description: Successful response with lyrics.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    song:
+                                        type: string
+                                    artist:
+                                        type: string
+                                    album:
+                                        type: string
+                                    duration:
+                                        type: string
+                                    parsedSongAndArtist:
+                                        type: string
+                                        nullable: true
+                                    videoId:
+                                        type: string
+                                    description:
+                                        type: string
+                                        nullable: true
+                                    debugInfo:
+                                        type: object
+                                        nullable: true
+                                    musixmatchWordByWordLyrics:
+                                        type: object
+                                        nullable: true
+                                    musixmatchSyncedLyrics:
+                                        type: object
+                                        nullable: true
+                                    lrclibSyncedLyrics:
+                                        type: object
+                                        nullable: true
+                                    lrclibPlainLyrics:
+                                        type: object
+                                        nullable: true
+                '400':
+                    description: Bad Request. Missing required parameters.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                                    song:
+                                        type: string
+                                        nullable: true
+                                    artist:
+                                        type: string
+                                        nullable: true
+                                    album:
+                                        type: string
+                                        nullable: true
+                                    duration:
+                                        type: string
+                                        nullable: true
+                                    parsedSongAndArtist:
+                                        type: string
+                                        nullable: true
+                                    videoId:
+                                        type: string
+                                    description:
+                                        type: string
+                                        nullable: true

@@ -1,20 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
-<body style="background-color:transparent; padding: 0; margin: 0; width: 0; height: 0;">
+<head>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body style="background-color:transparent; margin: 0;">
 
+<div class="cf-turnstile"
+     data-sitekey="0x4AAAAAAB3r6jRoddwH5ypO"
+     data-callback="onTurnstileSuccess"
+     data-error-callback="onTurnstileError"
+     data-expired-callback="onTurnstileExpired"
+     data-timeout-callback="onTurnstileTimeout"
+     data-appearance="interaction-only">
+</div>
 
 <script>
-    function jsdOnload() {
-        window.cloudflare.jsd.executeOnce(
-            {
-                callback: function(result) {
-                    console.log('CF Challenge', result);
-                }
-            }
-        );
+    function onTurnstileSuccess(token) {
+        window.parent.postMessage({ type: 'turnstile-token', token: token }, '*');
     }
-</script>
-<script src="/cdn-cgi/challenge-platform/scripts/jsd/api.js?onload=jsdOnload" async></script>
 
+    function onTurnstileError(errorCode) {
+        window.parent.postMessage({ type: 'turnstile-error', error: errorCode }, '*');
+    }
+
+    function onTurnstileExpired() {
+        window.parent.postMessage({ type: 'turnstile-expired' }, '*');
+    }
+
+    function onTurnstileTimeout() {
+        window.parent.postMessage({ type: 'turnstile-timeout' }, '*');
+    }
+
+    window.addEventListener('message', (event) => {
+        if (event.data.type === 'reset-turnstile') {
+            turnstile.reset();
+        }
+    });
+</script>
 </body>
 </html>
