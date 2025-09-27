@@ -28,15 +28,24 @@ type videoMetaType = {
     }]
 }
 
+function sleep(milliseconds: number) {
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 const cache = caches.default;
 
-export async function getLyrics(request: Request<unknown, IncomingRequestCfProperties<unknown>>, env: Env): Promise<Response> {
+export async function getLyrics(request: Request, env: Env): Promise<Response> {
     let cachedResponse = await cache.match(request.url);
     if (cachedResponse) {
         observe({ usingCachedLyrics: true });
         return cachedResponse;
     } else {
         observe({ usingCachedLyrics: false });
+    }
+
+    if (request.headers.get('User-Agent')?.toLowerCase() === 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36') {
+        await sleep(20000);
+        return new Response(JSON.stringify({}));
     }
 
     let params = new URL(request.url).searchParams;
