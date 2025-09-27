@@ -7,6 +7,14 @@ info:
         It can be queried using a YouTube Video ID, or a combination of song, artist, and album.
 servers:
     -   url: https://lyrics.api.dacubeking.com/
+components:
+    securitySchemes:
+        bearerAuth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+security:
+    -   bearerAuth: [ ]
 paths:
     /:
         get:
@@ -42,16 +50,6 @@ paths:
                 -   name: alwaysFetchMetadata
                     in: query
                     description: If true, it will always fetch metadata from the YouTube API.
-                    schema:
-                        type: boolean
-                -   name: useLrcLib
-                    in: query
-                    description: unused
-                    schema:
-                        type: boolean
-                -   name: enhanced
-                    in: query
-                    description: unused
                     schema:
                         type: boolean
 
@@ -124,3 +122,35 @@ paths:
                                     description:
                                         type: string
                                         nullable: true
+    /verify-turnstile:
+        post:
+            summary: Verify Turnstile Token
+            description: Verifies a Turnstile token and returns a JWT if valid.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                token:
+                                    type: string
+                                    description: The Turnstile token from the client.
+            responses:
+                '200':
+                    description: Successfully verified Turnstile token and returned a JWT.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    jwt:
+                                        type: string
+                                        description: The JWT to use for subsequent requests.
+                '400':
+                    description: Bad Request. Turnstile token not provided.
+                '401':
+                    description: Unauthorized. Invalid Turnstile token.
+                '500':
+                    description: Internal Server Error.
+
