@@ -36,14 +36,14 @@ mode = "smart"
 binding = "DB"
 database_name = "lyrics"
 database_id = "7da5510e-b086-4d47-aae8-837936f9cdc6"
-preview_database_id = "a0e07b42-ba20-477e-88a3-59dc7d7c320a"
+#preview_database_id = "a0e07b42-ba20-477e-88a3-59dc7d7c320a"
 
 # Bind an R2 Bucket. Use R2 to store arbitrarily large blobs of data, such as files.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#r2-buckets
 [[r2_buckets]]
 binding = "LYRICS_BUCKET"
 bucket_name = "lyrics-bucket"
-preview_bucket_name = "lyrics-bucket-preview"
+#preview_bucket_name = "lyrics-bucket-preview"
 
 # Bind another Worker service. Use this binding to call another Worker without network overhead.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
