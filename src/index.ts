@@ -98,7 +98,7 @@ async function handleLyricsRequest(request: Request, env: Env, ctx: ExecutionCon
     if (authHeader) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return new Response(JSON.stringify({ error: 'Authorization header missing or malformed' }), {
-                status: 401,
+                status: 403,
                 headers: corsHeaders
             });
         }
@@ -108,7 +108,7 @@ async function handleLyricsRequest(request: Request, env: Env, ctx: ExecutionCon
 
         if (!isTokenValid) {
             return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-                status: 401,
+                status: 403,
                 headers: corsHeaders
             });
         }
