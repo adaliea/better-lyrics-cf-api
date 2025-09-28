@@ -72,7 +72,7 @@ async function handleTurnstileVerification(request: Request, env: Env): Promise<
         const isValid = await verifyTurnstileToken(turnstileToken, env.TURNSTILE_SECRET_KEY);
 
         if (isValid) {
-            const jwt = await createJwt(env.JWT_SECRET);
+            const jwt = await createJwt(env.JWT_SECRET, request.headers.get("CF-Connecting-IP") || "");
             return new Response(JSON.stringify({ jwt }), { status: 200, headers: corsHeaders });
         } else {
             return new Response(JSON.stringify({ error: 'Invalid Turnstile token' }), {
@@ -93,23 +93,26 @@ async function handleLyricsRequest(request: Request, env: Env, ctx: ExecutionCon
         'Content-Type': 'application/json'
     };
 
-    // const authHeader = request.headers.get('Authorization');
-    // if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    //     return new Response(JSON.stringify({ error: 'Authorization header missing or malformed' }), {
-    //         status: 401,
-    //         headers: corsHeaders
-    //     });
-    // }
-    //
-    // const token = authHeader.substring(7); // Remove "Bearer "
-    // const isTokenValid = await verifyJwt(token, env.JWT_SECRET);
-    //
-    // if (!isTokenValid) {
-    //     return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-    //         status: 401,
-    //         headers: corsHeaders
-    //     });
-    // }
+    const authHeader = request.headers.get('Authorization');
+    // Check auth if it exists, but don't enforce yet
+    if (authHeader) {
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return new Response(JSON.stringify({ error: 'Authorization header missing or malformed' }), {
+                status: 401,
+                headers: corsHeaders
+            });
+        }
+
+        const token = authHeader.substring(7); // Remove "Bearer "
+        const isTokenValid = await verifyJwt(token, env.JWT_SECRET, request.headers.get("CF-Connecting-IP") || "");
+
+        if (!isTokenValid) {
+            return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+                status: 401,
+                headers: corsHeaders
+            });
+        }
+    }
 
     // If token is valid, proceed to get the lyrics
     try {
