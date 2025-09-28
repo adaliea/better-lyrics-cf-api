@@ -42,7 +42,7 @@ export default {
             return handleTurnstileVerification(request, env);
         }
 
-        if (url.pathname === '/') {
+        if (url.pathname === '/' || url.pathname === "/lyrics") {
             return handleLyricsRequest(request, env, ctx);
         }
 
