@@ -53,6 +53,7 @@ export default {
             return new Response('Internal Error', { status: 500 });
         } finally {
             console.log(observabilityData);
+            // console.log(observabilityData);
         }
     },
 } satisfies ExportedHandler<Env>;
@@ -102,24 +103,23 @@ async function handleLyricsRequest(request: Request, env: Env, ctx: ExecutionCon
 
     const authHeader = request.headers.get('Authorization');
     // Check auth if it exists, but don't enforce yet
-    if (authHeader) {
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return new Response(JSON.stringify({ error: 'Authorization header missing or malformed' }), {
-                status: 403,
-                headers: corsHeaders
-            });
-        }
-
-        const token = authHeader.substring(7); // Remove "Bearer "
-        const isTokenValid = await verifyJwt(token, env.JWT_SECRET, request.headers.get("CF-Connecting-IP") || "");
-
-        if (!isTokenValid) {
-            return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-                status: 403,
-                headers: corsHeaders
-            });
-        }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Authorization header missing or malformed' }), {
+            status: 403,
+            headers: corsHeaders
+        });
     }
+
+    const token = authHeader.substring(7); // Remove "Bearer "
+    const isTokenValid = await verifyJwt(token, env.JWT_SECRET, request.headers.get("CF-Connecting-IP") || "");
+
+    if (!isTokenValid) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+            status: 403,
+            headers: corsHeaders
+        });
+    }
+
 
     // If token is valid, proceed to get the lyrics
     try {
