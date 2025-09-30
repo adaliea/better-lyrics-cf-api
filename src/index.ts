@@ -20,33 +20,40 @@ export function observe(data: Record<string, any>): void {
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         awaitLists = new Set<Promise<any>>();
+        observabilityData = {};
         const url = new URL(request.url);
+        try {
+            // Simple Router
+            if (request.method === "OPTIONS") {
+                return new Response(null, {
+                    headers: {
+                        "Content-Type": "application/json",
+                        'Access-Control-Allow-Origin': 'https://music.youtube.com',
+                        'Access-Control-Allow-Credentials': 'true',
+                        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                        'Access-Control-Allow-Headers': 'Authorization, Content-Type'
+                    },
+                });
+            }
+            if (url.pathname === '/challenge') {
+                return env.ASSETS.fetch(request);
+            }
 
-        // Simple Router
-        if (request.method === "OPTIONS") {
-            return new Response(null, {
-                headers: {
-                    "Content-Type": "application/json",
-                    'Access-Control-Allow-Origin': 'https://music.youtube.com',
-                    'Access-Control-Allow-Credentials': 'true',
-                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Authorization, Content-Type'
-                },
-            });
-        }
-        if (url.pathname === '/challenge') {
-            return env.ASSETS.fetch(request);
-        }
+            if (url.pathname === '/verify-turnstile' && request.method === 'POST') {
+                return handleTurnstileVerification(request, env);
+            }
 
-        if (url.pathname === '/verify-turnstile' && request.method === 'POST') {
-            return handleTurnstileVerification(request, env);
-        }
+            if (url.pathname === '/' || url.pathname === "/lyrics") {
+                return handleLyricsRequest(request, env, ctx);
+            }
 
-        if (url.pathname === '/' || url.pathname === "/lyrics") {
-            return handleLyricsRequest(request, env, ctx);
+            return new Response('Not Found', { status: 404 });
+        } catch (e) {
+            console.error(e);
+            return new Response('Internal Error', { status: 500 });
+        } finally {
+            console.log(observabilityData);
         }
-
-        return new Response('Not Found', { status: 404 });
     },
 } satisfies ExportedHandler<Env>;
 
